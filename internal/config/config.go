@@ -18,11 +18,12 @@ type Config struct {
 	JWTAccessExpiry     time.Duration
 	JWTRefreshExpiry    time.Duration
 
-	MinIOEndpoint  string
-	MinIOAccessKey string
-	MinIOSecretKey string
-	MinIOBucket    string
-	MinIOUseSSL    bool
+	MinIOEndpoint       string
+	MinIOPublicEndpoint string
+	MinIOAccessKey      string
+	MinIOSecretKey      string
+	MinIOBucket         string
+	MinIOUseSSL         bool
 
 	CORSOrigins string
 
@@ -44,11 +45,12 @@ func Load() *Config {
 		JWTAccessExpiry:  getDurationEnv("JWT_ACCESS_EXPIRY", 15*time.Minute),
 		JWTRefreshExpiry: getDurationEnv("JWT_REFRESH_EXPIRY", 7*24*time.Hour),
 
-		MinIOEndpoint:  getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinIOAccessKey: getEnv("MINIO_ACCESS_KEY", "minioadmin"),
-		MinIOSecretKey: getEnv("MINIO_SECRET_KEY", "minioadmin"),
-		MinIOBucket:    getEnv("MINIO_BUCKET", "silsilah-media"),
-		MinIOUseSSL:    getBoolEnv("MINIO_USE_SSL", false),
+		MinIOEndpoint:       getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		MinIOPublicEndpoint: getEnv("MINIO_PUBLIC_ENDPOINT", getEnv("MINIO_ENDPOINT", "localhost:9000")),
+		MinIOAccessKey:      getEnv("MINIO_ACCESS_KEY", "minioadmin"),
+		MinIOSecretKey:      getEnv("MINIO_SECRET_KEY", "minioadmin"),
+		MinIOBucket:         getEnv("MINIO_BUCKET", "silsilah-media"),
+		MinIOUseSSL:         getBoolEnv("MINIO_USE_SSL", false),
 
 		CORSOrigins: getEnv("CORS_ORIGINS", "http://localhost:5173"),
 

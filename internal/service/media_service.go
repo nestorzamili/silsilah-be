@@ -110,7 +110,7 @@ func (s *mediaService) getPublicURL(storagePath string) string {
 	if s.cfg.MinIOUseSSL {
 		scheme = "https"
 	}
-	return fmt.Sprintf("%s://%s/%s/%s", scheme, s.cfg.MinIOEndpoint, s.cfg.MinIOBucket, url.PathEscape(storagePath))
+	return fmt.Sprintf("%s://%s/%s/%s", scheme, s.cfg.MinIOPublicEndpoint, s.cfg.MinIOBucket, url.PathEscape(storagePath))
 }
 
 func (s *mediaService) Approve(ctx context.Context, id uuid.UUID) error {
