@@ -24,6 +24,7 @@ type Config struct {
 	MinIOSecretKey      string
 	MinIOBucket         string
 	MinIOUseSSL         bool
+	MinIOPublicUseSSL   bool
 
 	CORSOrigins string
 
@@ -51,6 +52,7 @@ func Load() *Config {
 		MinIOSecretKey:      getEnv("MINIO_SECRET_KEY", "minioadmin"),
 		MinIOBucket:         getEnv("MINIO_BUCKET", "silsilah-media"),
 		MinIOUseSSL:         getBoolEnv("MINIO_USE_SSL", false),
+		MinIOPublicUseSSL:   getBoolEnv("MINIO_PUBLIC_USE_SSL", true),
 
 		CORSOrigins: getEnv("CORS_ORIGINS", "http://localhost:5173"),
 

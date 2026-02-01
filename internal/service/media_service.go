@@ -107,7 +107,7 @@ func (s *mediaService) List(ctx context.Context, personID *uuid.UUID, params dom
 
 func (s *mediaService) getPublicURL(storagePath string) string {
 	scheme := "http"
-	if s.cfg.MinIOUseSSL {
+	if s.cfg.MinIOPublicUseSSL {
 		scheme = "https"
 	}
 	return fmt.Sprintf("%s://%s/%s/%s", scheme, s.cfg.MinIOPublicEndpoint, s.cfg.MinIOBucket, url.PathEscape(storagePath))
