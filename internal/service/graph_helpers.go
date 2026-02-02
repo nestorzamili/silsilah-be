@@ -24,6 +24,7 @@ func personToGraphNode(p *domain.Person, generation *int) domain.GraphNode {
 		ID:         p.ID,
 		FirstName:  p.FirstName,
 		LastName:   p.LastName,
+		Nickname:   p.Nickname,
 		Gender:     p.Gender,
 		AvatarURL:  p.AvatarURL,
 		IsAlive:    p.IsAlive,

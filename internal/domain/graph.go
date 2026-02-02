@@ -6,6 +6,7 @@ type GraphNode struct {
 	ID        uuid.UUID `json:"id" db:"id"`
 	FirstName string    `json:"first_name" db:"first_name"`
 	LastName  *string   `json:"last_name,omitempty" db:"last_name"`
+	Nickname  *string   `json:"nickname,omitempty" db:"nickname"`
 	Gender    Gender    `json:"gender" db:"gender"`
 	AvatarURL *string   `json:"avatar_url,omitempty" db:"avatar_url"`
 	IsAlive   bool      `json:"is_alive" db:"is_alive"`

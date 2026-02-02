@@ -61,6 +61,9 @@ func main() {
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 
+	// Add middleware to extract real IP (for Cloudflare) and User-Agent
+	app.Use(middleware.RequestInfo())
+
 	setupRoutes(app, handlers, services.Auth)
 
 	port := os.Getenv("PORT")

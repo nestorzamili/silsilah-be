@@ -84,7 +84,12 @@ func (h *ChangeRequestHandler) Approve(c *fiber.Ctx) error {
 	var input domain.ReviewChangeRequestInput
 	_ = c.BodyParser(&input)
 
-	if err := h.crService.Approve(c.Context(), requestID, user.ID, input.Note); err != nil {
+	meta := &service.RequestMeta{
+		IPAddress: middleware.GetIPAddress(c),
+		UserAgent: middleware.GetUserAgentFromContext(c),
+	}
+
+	if err := h.crService.Approve(c.Context(), requestID, user.ID, input.Note, meta); err != nil {
 		return err
 	}
 
@@ -110,7 +115,12 @@ func (h *ChangeRequestHandler) Reject(c *fiber.Ctx) error {
 	var input domain.ReviewChangeRequestInput
 	_ = c.BodyParser(&input)
 
-	if err := h.crService.Reject(c.Context(), requestID, user.ID, input.Note); err != nil {
+	meta := &service.RequestMeta{
+		IPAddress: middleware.GetIPAddress(c),
+		UserAgent: middleware.GetUserAgentFromContext(c),
+	}
+
+	if err := h.crService.Reject(c.Context(), requestID, user.ID, input.Note, meta); err != nil {
 		return err
 	}
 

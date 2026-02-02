@@ -12,12 +12,17 @@ import (
 	"silsilah-keluarga/internal/repository"
 )
 
+type RequestMeta struct {
+	IPAddress string
+	UserAgent string
+}
+
 type ChangeRequestService interface {
 	Create(ctx context.Context, userID uuid.UUID, input domain.CreateChangeRequestInput) (*domain.ChangeRequest, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.ChangeRequest, error)
 	List(ctx context.Context, status *domain.ChangeRequestStatus, params domain.PaginationParams) (domain.PaginatedResponse[domain.ChangeRequest], error)
-	Approve(ctx context.Context, id, reviewerID uuid.UUID, note *string) error
-	Reject(ctx context.Context, id, reviewerID uuid.UUID, note *string) error
+	Approve(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error
+	Reject(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error
 }
 
 type changeRequestService struct {
@@ -151,7 +156,7 @@ func (s *changeRequestService) List(ctx context.Context, status *domain.ChangeRe
 	return domain.NewPaginatedResponse(requests, params.Page, params.PageSize, total), nil
 }
 
-func (s *changeRequestService) Approve(ctx context.Context, id, reviewerID uuid.UUID, note *string) error {
+func (s *changeRequestService) Approve(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error {
 	cr, err := s.crRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -170,12 +175,12 @@ func (s *changeRequestService) Approve(ctx context.Context, id, reviewerID uuid.
 	}
 
 	s.notifyRequester(ctx, cr, domain.StatusApproved, note)
-	s.logAudit(ctx, reviewerID, "APPROVE_CHANGE_REQUEST", cr)
+	s.logAudit(ctx, reviewerID, "APPROVE_CHANGE_REQUEST", cr, meta)
 
 	return nil
 }
 
-func (s *changeRequestService) Reject(ctx context.Context, id, reviewerID uuid.UUID, note *string) error {
+func (s *changeRequestService) Reject(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error {
 	cr, err := s.crRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -190,7 +195,7 @@ func (s *changeRequestService) Reject(ctx context.Context, id, reviewerID uuid.U
 	}
 
 	s.notifyRequester(ctx, cr, domain.StatusRejected, note)
-	s.logAudit(ctx, reviewerID, "REJECT_CHANGE_REQUEST", cr)
+	s.logAudit(ctx, reviewerID, "REJECT_CHANGE_REQUEST", cr, meta)
 
 	return nil
 }
@@ -373,7 +378,7 @@ func (s *changeRequestService) notifyRequester(ctx context.Context, cr *domain.C
 	_ = s.notifRepo.Create(ctx, notif)
 }
 
-func (s *changeRequestService) logAudit(ctx context.Context, reviewerID uuid.UUID, action string, cr *domain.ChangeRequest) {
+func (s *changeRequestService) logAudit(ctx context.Context, reviewerID uuid.UUID, action string, cr *domain.ChangeRequest, meta *RequestMeta) {
 	var entityID uuid.UUID
 	if cr.EntityID != nil {
 		entityID = *cr.EntityID
@@ -390,6 +395,15 @@ func (s *changeRequestService) logAudit(ctx context.Context, reviewerID uuid.UUI
 		OldValue:   json.RawMessage(`{"status":"PENDING"}`),
 		NewValue:   json.RawMessage(`{"status":"` + string(cr.Status) + `"}`),
 		CreatedAt:  time.Now(),
+	}
+
+	if meta != nil {
+		if meta.IPAddress != "" {
+			audit.IPAddress = &meta.IPAddress
+		}
+		if meta.UserAgent != "" {
+			audit.UserAgent = &meta.UserAgent
+		}
 	}
 
 	_ = s.auditRepo.Create(ctx, audit)
