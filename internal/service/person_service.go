@@ -115,53 +115,57 @@ func (s *personService) Update(ctx context.Context, id uuid.UUID, userID uuid.UU
 	if input.FirstName != nil {
 		person.FirstName = *input.FirstName
 	}
-	if input.LastName != nil {
-		person.LastName = *input.LastName
+	if input.LastName.Set {
+		person.LastName = input.LastName.Value
 	}
-	if input.Nickname != nil {
-		person.Nickname = *input.Nickname
+	if input.Nickname.Set {
+		person.Nickname = input.Nickname.Value
 	}
-	if input.Gender != nil {
-		person.Gender = *input.Gender
+	if input.Gender.Set {
+		if input.Gender.Value != nil {
+			person.Gender = *input.Gender.Value
+		} else {
+			person.Gender = domain.GenderUnknown
+		}
 	}
-	if input.BirthDate != nil {
-		person.BirthDate = *input.BirthDate
+	if input.BirthDate.Set {
+		person.BirthDate = input.BirthDate.Value
 	}
-	if input.BirthPlace != nil {
-		person.BirthPlace = *input.BirthPlace
+	if input.BirthPlace.Set {
+		person.BirthPlace = input.BirthPlace.Value
 	}
-	if input.DeathDate != nil {
-		person.DeathDate = *input.DeathDate
+	if input.DeathDate.Set {
+		person.DeathDate = input.DeathDate.Value
 	}
-	if input.DeathPlace != nil {
-		person.DeathPlace = *input.DeathPlace
+	if input.DeathPlace.Set {
+		person.DeathPlace = input.DeathPlace.Value
 	}
-	if input.Bio != nil {
-		person.Bio = *input.Bio
+	if input.Bio.Set {
+		person.Bio = input.Bio.Value
 	}
-	if input.AvatarURL != nil {
-		person.AvatarURL = *input.AvatarURL
+	if input.AvatarURL.Set {
+		person.AvatarURL = input.AvatarURL.Value
 	}
-	if input.Occupation != nil {
-		person.Occupation = *input.Occupation
+	if input.Occupation.Set {
+		person.Occupation = input.Occupation.Value
 	}
-	if input.Religion != nil {
-		person.Religion = *input.Religion
+	if input.Religion.Set {
+		person.Religion = input.Religion.Value
 	}
-	if input.Nationality != nil {
-		person.Nationality = *input.Nationality
+	if input.Nationality.Set {
+		person.Nationality = input.Nationality.Value
 	}
-	if input.Education != nil {
-		person.Education = *input.Education
+	if input.Education.Set {
+		person.Education = input.Education.Value
 	}
-	if input.Phone != nil {
-		person.Phone = *input.Phone
+	if input.Phone.Set {
+		person.Phone = input.Phone.Value
 	}
-	if input.Email != nil {
-		person.Email = *input.Email
+	if input.Email.Set {
+		person.Email = input.Email.Value
 	}
-	if input.Address != nil {
-		person.Address = *input.Address
+	if input.Address.Set {
+		person.Address = input.Address.Value
 	}
 	if input.IsAlive != nil {
 		person.IsAlive = *input.IsAlive

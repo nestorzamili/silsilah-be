@@ -83,10 +83,12 @@ func (s *graphService) GetFullGraph(ctx context.Context) (*domain.FamilyGraph, e
 		personIdSet[p.ID] = true
 	}
 	edges := buildEdgesForNodes(relationships, personIdSet)
+	groups := buildFamilyGroups(relationships, personIdSet)
 
 	graph := &domain.FamilyGraph{
-		Nodes: nodes,
-		Edges: edges,
+		Nodes:  nodes,
+		Edges:  edges,
+		Groups: groups,
 		Stats: &domain.GraphStats{
 			TotalPersons:       len(connectedPersons),
 			TotalRelationships: len(relationships),

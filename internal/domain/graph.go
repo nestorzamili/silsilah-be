@@ -30,10 +30,18 @@ type GraphEdge struct {
 	ChildOrder       *int `json:"child_order,omitempty" db:"child_order"`  
 }
 
+type FamilyGroup struct {
+	ID          string      `json:"id"`
+	Parents     []uuid.UUID `json:"parents"`
+	Children    []uuid.UUID `json:"children"`
+	SpouseOrder int         `json:"spouse_order"`
+}
+
 type FamilyGraph struct {
-	Nodes []GraphNode  `json:"nodes"`
-	Edges []GraphEdge  `json:"edges"`
-	Stats *GraphStats  `json:"stats,omitempty"`
+	Nodes  []GraphNode    `json:"nodes"`
+	Edges  []GraphEdge    `json:"edges"`
+	Groups []FamilyGroup  `json:"groups,omitempty"`
+	Stats  *GraphStats    `json:"stats,omitempty"`
 }
 
 type GraphStats struct {

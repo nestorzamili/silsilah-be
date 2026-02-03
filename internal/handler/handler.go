@@ -11,7 +11,6 @@ type Handlers struct {
 	ChangeRequest *ChangeRequestHandler
 	Media         *MediaHandler
 	Comment       *CommentHandler
-	Public        *PublicHandler
 	Audit         *AuditHandler
 	Notification  *NotificationHandler
 }
@@ -26,7 +25,6 @@ func NewHandlers(services *service.Services) *Handlers {
 		ChangeRequest: NewChangeRequestHandler(services.ChangeRequest),
 		Media:         NewMediaHandler(services.Media, services.ChangeRequest),
 		Comment:       NewCommentHandler(services.Comment),
-		Public:        NewPublicHandler(services.Person, services.Graph),
 		Audit:         NewAuditHandler(services.Audit),
 		Notification:  NewNotificationHandler(services.Notification),
 	}

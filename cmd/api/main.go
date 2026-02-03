@@ -84,10 +84,6 @@ func setupRoutes(app *fiber.App, h *handler.Handlers, authService service.AuthSe
 
 	v1 := app.Group("/api/v1")
 
-	public := v1.Group("/public")
-	public.Get("/graph", h.Public.GetGraph)
-	public.Get("/persons/:personId", h.Public.GetPerson)
-
 	auth := v1.Group("/auth")
 	auth.Post("/register", h.Auth.Register)
 	auth.Post("/login", h.Auth.Login)

@@ -1,10 +1,68 @@
 package domain
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+type NullableString struct {
+	Value *string
+	Set   bool
+}
+
+func (n *NullableString) UnmarshalJSON(data []byte) error {
+	n.Set = true
+	if string(data) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	n.Value = &s
+	return nil
+}
+
+type NullableTime struct {
+	Value *time.Time
+	Set   bool
+}
+
+func (n *NullableTime) UnmarshalJSON(data []byte) error {
+	n.Set = true
+	if string(data) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var t time.Time
+	if err := json.Unmarshal(data, &t); err != nil {
+		return err
+	}
+	n.Value = &t
+	return nil
+}
+
+type NullableGender struct {
+	Value *Gender
+	Set   bool
+}
+
+func (n *NullableGender) UnmarshalJSON(data []byte) error {
+	n.Set = true
+	if string(data) == "null" {
+		n.Value = nil
+		return nil
+	}
+	var g Gender
+	if err := json.Unmarshal(data, &g); err != nil {
+		return err
+	}
+	n.Value = &g
+	return nil
+}
 
 type Person struct {
 	ID         uuid.UUID  `json:"id" db:"id"`
@@ -69,24 +127,24 @@ type CreatePersonInput struct {
 }
 
 type UpdatePersonInput struct {
-	FirstName   *string     `json:"first_name,omitempty" validate:"omitempty,min=1,max=100"`
-	LastName    **string    `json:"last_name,omitempty" validate:"omitempty,max=100"`
-	Nickname    **string    `json:"nickname,omitempty" validate:"omitempty,max=50"`
-	Gender      *Gender     `json:"gender,omitempty"`
-	BirthDate   **time.Time `json:"birth_date,omitempty"`
-	BirthPlace  **string    `json:"birth_place,omitempty" validate:"omitempty,max=200"`
-	DeathDate   **time.Time `json:"death_date,omitempty"`
-	DeathPlace  **string    `json:"death_place,omitempty" validate:"omitempty,max=200"`
-	Bio         **string    `json:"bio,omitempty" validate:"omitempty,max=2000"`
-	AvatarURL   **string    `json:"avatar_url,omitempty"`
-	Occupation  **string    `json:"occupation,omitempty" validate:"omitempty,max=200"`
-	Religion    **string    `json:"religion,omitempty" validate:"omitempty,max=50"`
-	Nationality **string    `json:"nationality,omitempty" validate:"omitempty,max=100"`
-	Education   **string    `json:"education,omitempty" validate:"omitempty,max=200"`
-	Phone       **string    `json:"phone,omitempty" validate:"omitempty,max=20"`
-	Email       **string    `json:"email,omitempty" validate:"omitempty,email,max=255"`
-	Address     **string    `json:"address,omitempty" validate:"omitempty,max=500"`
-	IsAlive     *bool       `json:"is_alive,omitempty"`
+	FirstName   *string        `json:"first_name" validate:"omitempty,min=1,max=100"`
+	LastName    NullableString `json:"last_name" validate:"omitempty,max=100"`
+	Nickname    NullableString `json:"nickname" validate:"omitempty,max=50"`
+	Gender      NullableGender `json:"gender"`
+	BirthDate   NullableTime   `json:"birth_date"`
+	BirthPlace  NullableString `json:"birth_place" validate:"omitempty,max=200"`
+	DeathDate   NullableTime   `json:"death_date"`
+	DeathPlace  NullableString `json:"death_place" validate:"omitempty,max=200"`
+	Bio         NullableString `json:"bio" validate:"omitempty,max=2000"`
+	AvatarURL   NullableString `json:"avatar_url"`
+	Occupation  NullableString `json:"occupation" validate:"omitempty,max=200"`
+	Religion    NullableString `json:"religion" validate:"omitempty,max=50"`
+	Nationality NullableString `json:"nationality" validate:"omitempty,max=100"`
+	Education   NullableString `json:"education" validate:"omitempty,max=200"`
+	Phone       NullableString `json:"phone" validate:"omitempty,max=20"`
+	Email       NullableString `json:"email" validate:"omitempty,email,max=255"`
+	Address     NullableString `json:"address" validate:"omitempty,max=500"`
+	IsAlive     *bool          `json:"is_alive"`
 }
 
 type PersonSearchInput struct {
