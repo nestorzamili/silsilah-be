@@ -74,13 +74,13 @@ func (s *relationshipService) Create(ctx context.Context, userID uuid.UUID, inpu
 	if input.Type == domain.RelTypeParent && input.Metadata != nil {
 		var parentMeta domain.ParentMetadata
 		if err := json.Unmarshal(input.Metadata, &parentMeta); err == nil && parentMeta.Role.IsValid() {
-			existingParents, err := s.relRepo.ListByPerson(ctx, input.PersonA)
+			existingParents, err := s.relRepo.ListByPerson(ctx, input.PersonB)
 			if err != nil {
 				return nil, err
 			}
 			
 			for _, rel := range existingParents {
-				if rel.Type == domain.RelTypeParent && rel.PersonA == input.PersonA {
+				if rel.Type == domain.RelTypeParent && rel.PersonB == input.PersonB {
 					var existingMeta domain.ParentMetadata
 					if err := json.Unmarshal(rel.Metadata, &existingMeta); err == nil {
 						if existingMeta.Role == parentMeta.Role {
