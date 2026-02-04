@@ -6,19 +6,22 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/changerequest"
 )
 
 type ChangeRequestHandler struct {
-	crService service.ChangeRequestService
+	crService changerequest.Service
 }
 
-func NewChangeRequestHandler(crService service.ChangeRequestService) *ChangeRequestHandler {
+func NewChangeRequestHandler(crService changerequest.Service) *ChangeRequestHandler {
 	return &ChangeRequestHandler{crService: crService}
 }
 
 func (h *ChangeRequestHandler) Create(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 
 	var input domain.CreateChangeRequestInput
 	if err := c.BodyParser(&input); err != nil {
@@ -84,7 +87,7 @@ func (h *ChangeRequestHandler) Approve(c *fiber.Ctx) error {
 	var input domain.ReviewChangeRequestInput
 	_ = c.BodyParser(&input)
 
-	meta := &service.RequestMeta{
+	meta := &changerequest.RequestMeta{
 		IPAddress: middleware.GetIPAddress(c),
 		UserAgent: middleware.GetUserAgentFromContext(c),
 	}
@@ -115,7 +118,7 @@ func (h *ChangeRequestHandler) Reject(c *fiber.Ctx) error {
 	var input domain.ReviewChangeRequestInput
 	_ = c.BodyParser(&input)
 
-	meta := &service.RequestMeta{
+	meta := &changerequest.RequestMeta{
 		IPAddress: middleware.GetIPAddress(c),
 		UserAgent: middleware.GetUserAgentFromContext(c),
 	}

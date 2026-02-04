@@ -1,4 +1,4 @@
-package service
+package audit
 
 import (
 	"context"
@@ -7,26 +7,26 @@ import (
 	"silsilah-keluarga/internal/repository"
 )
 
-type AuditService interface {
+type Service interface {
 	GetRecentActivities(ctx context.Context, limit int) ([]domain.AuditLog, error)
 }
 
-type auditService struct {
+type service struct {
 	auditRepo repository.AuditLogRepository
 }
 
-func NewAuditService(auditRepo repository.AuditLogRepository) AuditService {
-	return &auditService{
+func NewService(auditRepo repository.AuditLogRepository) Service {
+	return &service{
 		auditRepo: auditRepo,
 	}
 }
 
-func (s *auditService) GetRecentActivities(ctx context.Context, limit int) ([]domain.AuditLog, error) {
+func (s *service) GetRecentActivities(ctx context.Context, limit int) ([]domain.AuditLog, error) {
 	params := domain.PaginationParams{
 		Page:     1,
 		PageSize: limit,
 	}
-	
+
 	logs, _, err := s.auditRepo.List(ctx, params)
 	return logs, err
 }

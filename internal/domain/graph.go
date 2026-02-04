@@ -26,15 +26,12 @@ type GraphEdge struct {
 	Metadata interface{}      `json:"metadata,omitempty" db:"metadata"`
 
 	IsConsanguineous bool `json:"is_consanguineous,omitempty" db:"is_consanguineous"`
-	SpouseOrder      *int `json:"spouse_order,omitempty" db:"spouse_order"` 
-	ChildOrder       *int `json:"child_order,omitempty" db:"child_order"`  
 }
 
 type FamilyGroup struct {
 	ID          string      `json:"id"`
 	Parents     []uuid.UUID `json:"parents"`
 	Children    []uuid.UUID `json:"children"`
-	SpouseOrder int         `json:"spouse_order"`
 }
 
 type FamilyGraph struct {

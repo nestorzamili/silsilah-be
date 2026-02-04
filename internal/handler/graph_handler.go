@@ -5,14 +5,14 @@ import (
 	"github.com/google/uuid"
 
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/graph"
 )
 
 type GraphHandler struct {
-	graphService service.GraphService
+	graphService graph.Service
 }
 
-func NewGraphHandler(graphService service.GraphService) *GraphHandler {
+func NewGraphHandler(graphService graph.Service) *GraphHandler {
 	return &GraphHandler{graphService: graphService}
 }
 
@@ -90,7 +90,39 @@ func (h *GraphHandler) FindRelationshipPath(c *fiber.Ctx) error {
 		return middleware.BadRequest("Invalid 'to' person ID")
 	}
 
-	path, err := h.graphService.FindRelationshipPath(c.Context(), fromID, toID)
+	maxDepth := c.QueryInt("max_depth", 20)
+	locale := c.Get("Accept-Language", "id")
+
+	path, err := h.graphService.FindRelationshipPath(c.Context(), fromID, toID, maxDepth, locale)
+	if err != nil {
+		return err
+	}
+
+	if path == nil {
+		return middleware.NotFound("No relationship path found")
+	}
+
+	return c.Status(fiber.StatusOK).JSON(path)
+}
+
+func (h *GraphHandler) ResolveRelationship(c *fiber.Ctx) error {
+	var input struct {
+		FromPersonID uuid.UUID `json:"from_person_id"`
+		ToPersonID   uuid.UUID `json:"to_person_id"`
+		MaxDepth     int       `json:"max_depth"`
+	}
+
+	if err := c.BodyParser(&input); err != nil {
+		return middleware.BadRequest("Invalid request body")
+	}
+
+	if input.FromPersonID == uuid.Nil || input.ToPersonID == uuid.Nil {
+		return middleware.BadRequest("from_person_id and to_person_id are required")
+	}
+
+	locale := c.Get("Accept-Language", "id")
+
+	path, err := h.graphService.FindRelationshipPath(c.Context(), input.FromPersonID, input.ToPersonID, input.MaxDepth, locale)
 	if err != nil {
 		return err
 	}

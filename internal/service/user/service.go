@@ -1,4 +1,4 @@
-package service
+package user
 
 import (
 	"context"
@@ -14,9 +14,10 @@ import (
 var (
 	ErrInsufficientPermissions   = errors.New("insufficient permissions")
 	ErrCannotModifySelf          = errors.New("cannot modify your own role")
+	ErrUserNotFound              = errors.New("user not found")
 )
 
-type UserService interface {
+type Service interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error)
 	Update(ctx context.Context, id uuid.UUID, input domain.UpdateUserInput) (*domain.User, error)
 	AssignRole(ctx context.Context, currentUser *domain.User, input domain.AssignRoleInput) error
@@ -26,19 +27,19 @@ type UserService interface {
 	DeleteUser(ctx context.Context, currentUser *domain.User, userID string) error
 }
 
-type userService struct {
+type service struct {
 	userRepo repository.UserRepository
 }
 
-func NewUserService(userRepo repository.UserRepository) UserService {
-	return &userService{userRepo: userRepo}
+func NewService(userRepo repository.UserRepository) Service {
+	return &service{userRepo: userRepo}
 }
 
-func (s *userService) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return s.userRepo.GetByID(ctx, id)
 }
 
-func (s *userService) Update(ctx context.Context, id uuid.UUID, input domain.UpdateUserInput) (*domain.User, error) {
+func (s *service) Update(ctx context.Context, id uuid.UUID, input domain.UpdateUserInput) (*domain.User, error) {
 	user, err := s.userRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -92,7 +93,7 @@ func (s *userService) Update(ctx context.Context, id uuid.UUID, input domain.Upd
 	return updatedUser, nil
 }
 
-func (s *userService) AssignRole(ctx context.Context, currentUser *domain.User, input domain.AssignRoleInput) error {
+func (s *service) AssignRole(ctx context.Context, currentUser *domain.User, input domain.AssignRoleInput) error {
 	if !currentUser.HasRole("developer") {
 		return ErrInsufficientPermissions
 	}
@@ -116,11 +117,11 @@ func (s *userService) AssignRole(ctx context.Context, currentUser *domain.User, 
 	return s.userRepo.AssignRole(ctx, input.UserID, input.Role)
 }
 
-func (s *userService) ListByRole(ctx context.Context, role string) ([]domain.User, error) {
+func (s *service) ListByRole(ctx context.Context, role string) ([]domain.User, error) {
 	return s.userRepo.ListByRole(ctx, role)
 }
 
-func (s *userService) GetRoleUsers(ctx context.Context) (map[string][]domain.User, error) {
+func (s *service) GetRoleUsers(ctx context.Context) (map[string][]domain.User, error) {
 	roles := []string{"member", "editor", "developer"}
 	result := make(map[string][]domain.User)
 
@@ -135,11 +136,11 @@ func (s *userService) GetRoleUsers(ctx context.Context) (map[string][]domain.Use
 	return result, nil
 }
 
-func (s *userService) GetAllUsers(ctx context.Context) ([]domain.User, error) {
+func (s *service) GetAllUsers(ctx context.Context) ([]domain.User, error) {
 	return s.userRepo.GetAllUsers(ctx)
 }
 
-func (s *userService) DeleteUser(ctx context.Context, currentUser *domain.User, userID string) error {
+func (s *service) DeleteUser(ctx context.Context, currentUser *domain.User, userID string) error {
 	if !currentUser.HasRole("developer") {
 		return ErrInsufficientPermissions
 	}

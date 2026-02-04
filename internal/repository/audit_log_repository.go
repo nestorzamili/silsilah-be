@@ -26,7 +26,7 @@ func NewAuditLogRepository(db *sqlx.DB) AuditLogRepository {
 
 func (r *auditLogRepository) Create(ctx context.Context, log *domain.AuditLog) error {
 	query := `
-		INSERT INTO audit_logs (id, user_id, action, entity_type, entity_id, old_value, new_value, ip_address, user_agent)
+		INSERT INTO audit_logs (log_id, user_id, action, entity_type, entity_id, old_value, new_value, ip_address, user_agent)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at`
 
@@ -50,7 +50,7 @@ func (r *auditLogRepository) List(ctx context.Context, params domain.PaginationP
 			al.*,
 			u.full_name as user_name
 		FROM audit_logs al
-		LEFT JOIN users u ON al.user_id = u.id
+		LEFT JOIN users u ON al.user_id = u.user_id
 		ORDER BY al.created_at DESC
 		LIMIT $1 OFFSET $2`
 

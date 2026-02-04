@@ -1,4 +1,4 @@
-package service
+package comment
 
 import (
 	"context"
@@ -12,9 +12,11 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/repository"
+	"silsilah-keluarga/internal/service/notification"
 )
 
-type CommentService interface {
+type Service interface {
+	SetNotificationService(notifSvc notification.Service)
 	Create(ctx context.Context, personID, userID uuid.UUID, input domain.CreateCommentInput) (*domain.Comment, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Comment, error)
 	Update(ctx context.Context, userID uuid.UUID, id uuid.UUID, input domain.UpdateCommentInput) (*domain.Comment, error)
@@ -22,19 +24,24 @@ type CommentService interface {
 	ListByPerson(ctx context.Context, personID uuid.UUID, params domain.PaginationParams) (domain.PaginatedResponse[domain.Comment], error)
 }
 
-type commentService struct {
+type service struct {
 	commentRepo repository.CommentRepository
 	redis       *redis.Client
+	notifSvc    notification.Service
 }
 
-func NewCommentService(commentRepo repository.CommentRepository, redis *redis.Client) CommentService {
-	return &commentService{
+func NewService(commentRepo repository.CommentRepository, redis *redis.Client) Service {
+	return &service{
 		commentRepo: commentRepo,
 		redis:       redis,
 	}
 }
 
-func (s *commentService) Create(ctx context.Context, personID, userID uuid.UUID, input domain.CreateCommentInput) (*domain.Comment, error) {
+func (s *service) SetNotificationService(notifSvc notification.Service) {
+	s.notifSvc = notifSvc
+}
+
+func (s *service) Create(ctx context.Context, personID, userID uuid.UUID, input domain.CreateCommentInput) (*domain.Comment, error) {
 	comment := &domain.Comment{
 		ID:       uuid.New(),
 		PersonID: personID,
@@ -54,14 +61,20 @@ func (s *commentService) Create(ctx context.Context, personID, userID uuid.UUID,
 		}
 	}
 
+	if s.notifSvc != nil {
+		go func() {
+			_ = s.notifSvc.NotifyNewComment(context.Background(), comment.ID, userID)
+		}()
+	}
+
 	return comment, nil
 }
 
-func (s *commentService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Comment, error) {
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*domain.Comment, error) {
 	return s.commentRepo.GetByID(ctx, id)
 }
 
-func (s *commentService) Update(ctx context.Context, userID uuid.UUID, id uuid.UUID, input domain.UpdateCommentInput) (*domain.Comment, error) {
+func (s *service) Update(ctx context.Context, userID uuid.UUID, id uuid.UUID, input domain.UpdateCommentInput) (*domain.Comment, error) {
 	comment, err := s.commentRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -91,7 +104,7 @@ func (s *commentService) Update(ctx context.Context, userID uuid.UUID, id uuid.U
 	return comment, nil
 }
 
-func (s *commentService) Delete(ctx context.Context, userID uuid.UUID, id uuid.UUID) error {
+func (s *service) Delete(ctx context.Context, userID uuid.UUID, id uuid.UUID) error {
 	comment, err := s.commentRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -114,7 +127,7 @@ func (s *commentService) Delete(ctx context.Context, userID uuid.UUID, id uuid.U
 	return s.commentRepo.Delete(ctx, id)
 }
 
-func (s *commentService) ListByPerson(ctx context.Context, personID uuid.UUID, params domain.PaginationParams) (domain.PaginatedResponse[domain.Comment], error) {
+func (s *service) ListByPerson(ctx context.Context, personID uuid.UUID, params domain.PaginationParams) (domain.PaginatedResponse[domain.Comment], error) {
 	cacheKey := fmt.Sprintf("comments:%s:page:%d:size:%d", personID, params.Page, params.PageSize)
 
 	if s.redis != nil {

@@ -1,22 +1,19 @@
-package service
+package person
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/repository"
+	"silsilah-keluarga/internal/service/graph"
+	"silsilah-keluarga/internal/service/notification"
 )
 
-var (
-	ErrPersonNotFound = errors.New("person not found")
-)
-
-type PersonService interface {
+type Service interface {
 	Create(ctx context.Context, userID uuid.UUID, input domain.CreatePersonInput) (*domain.Person, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Person, error)
 	GetByIDWithRelationships(ctx context.Context, personID uuid.UUID) (*domain.PersonWithRelationships, error)
@@ -25,17 +22,19 @@ type PersonService interface {
 	List(ctx context.Context, params domain.PaginationParams) (domain.PaginatedResponse[domain.Person], error)
 	Search(ctx context.Context, query string, limit int) ([]domain.Person, error)
 	GetAncestors(ctx context.Context, personID uuid.UUID) ([]domain.Person, error)
+	SetNotificationService(notifSvc notification.Service)
 }
 
-type personService struct {
+type service struct {
 	personRepo       repository.PersonRepository
 	relationshipRepo repository.RelationshipRepository
 	auditRepo        repository.AuditLogRepository
 	redis            *redis.Client
+	notifSvc         notification.Service
 }
 
-func NewPersonService(personRepo repository.PersonRepository, relationshipRepo repository.RelationshipRepository, auditRepo repository.AuditLogRepository, redis *redis.Client) PersonService {
-	return &personService{
+func NewService(personRepo repository.PersonRepository, relationshipRepo repository.RelationshipRepository, auditRepo repository.AuditLogRepository, redis *redis.Client) Service {
+	return &service{
 		personRepo:       personRepo,
 		relationshipRepo: relationshipRepo,
 		auditRepo:        auditRepo,
@@ -43,7 +42,11 @@ func NewPersonService(personRepo repository.PersonRepository, relationshipRepo r
 	}
 }
 
-func (s *personService) Create(ctx context.Context, userID uuid.UUID, input domain.CreatePersonInput) (*domain.Person, error) {
+func (s *service) SetNotificationService(notifSvc notification.Service) {
+	s.notifSvc = notifSvc
+}
+
+func (s *service) Create(ctx context.Context, userID uuid.UUID, input domain.CreatePersonInput) (*domain.Person, error) {
 	isAlive := true
 	if input.IsAlive != nil {
 		isAlive = *input.IsAlive
@@ -87,27 +90,33 @@ func (s *personService) Create(ctx context.Context, userID uuid.UUID, input doma
 		_ = s.redis.Del(ctx, "family:graph").Err()
 	}
 
+	if s.notifSvc != nil {
+		go func() {
+			_ = s.notifSvc.NotifyPersonAdded(context.Background(), person.ID, userID)
+		}()
+	}
+
 	return person, nil
 }
 
-func (s *personService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Person, error) {
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*domain.Person, error) {
 	person, err := s.personRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if person == nil {
-		return nil, ErrPersonNotFound
+		return nil, domain.ErrPersonNotFound
 	}
 	return person, nil
 }
 
-func (s *personService) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, input domain.UpdatePersonInput) (*domain.Person, error) {
+func (s *service) Update(ctx context.Context, id uuid.UUID, userID uuid.UUID, input domain.UpdatePersonInput) (*domain.Person, error) {
 	person, err := s.personRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if person == nil {
-		return nil, ErrPersonNotFound
+		return nil, domain.ErrPersonNotFound
 	}
 
 	oldPerson := *person
@@ -191,7 +200,7 @@ func (s *personService) Update(ctx context.Context, id uuid.UUID, userID uuid.UU
 	return person, nil
 }
 
-func (s *personService) Delete(ctx context.Context, id uuid.UUID) error {
+func (s *service) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := s.personRepo.Delete(ctx, id); err != nil {
 		return err
 	}
@@ -203,7 +212,7 @@ func (s *personService) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (s *personService) List(ctx context.Context, params domain.PaginationParams) (domain.PaginatedResponse[domain.Person], error) {
+func (s *service) List(ctx context.Context, params domain.PaginationParams) (domain.PaginatedResponse[domain.Person], error) {
 	persons, total, err := s.personRepo.List(ctx, params)
 	if err != nil {
 		return domain.PaginatedResponse[domain.Person]{}, err
@@ -212,17 +221,17 @@ func (s *personService) List(ctx context.Context, params domain.PaginationParams
 	return domain.NewPaginatedResponse(persons, params.Page, params.PageSize, total), nil
 }
 
-func (s *personService) Search(ctx context.Context, query string, limit int) ([]domain.Person, error) {
+func (s *service) Search(ctx context.Context, query string, limit int) ([]domain.Person, error) {
 	return s.personRepo.Search(ctx, query, limit)
 }
 
-func (s *personService) GetByIDWithRelationships(ctx context.Context, personID uuid.UUID) (*domain.PersonWithRelationships, error) {
+func (s *service) GetByIDWithRelationships(ctx context.Context, personID uuid.UUID) (*domain.PersonWithRelationships, error) {
 	person, err := s.personRepo.GetByID(ctx, personID)
 	if err != nil {
 		return nil, err
 	}
 	if person == nil {
-		return nil, ErrPersonNotFound
+		return nil, domain.ErrPersonNotFound
 	}
 
 	result := &domain.PersonWithRelationships{
@@ -251,7 +260,7 @@ func (s *personService) GetByIDWithRelationships(ctx context.Context, personID u
 							role = string(meta.Role)
 						}
 					}
-					
+
 					result.Parents = append(result.Parents, domain.ParentInfo{
 						Person: *p,
 						Role:   role,
@@ -302,7 +311,7 @@ func (s *personService) GetByIDWithRelationships(ctx context.Context, personID u
 		}
 	}
 
-	siblings, err := s.relationshipRepo.GetSiblings(ctx, personID)
+	siblings, err := graph.GetSiblingsLogic(ctx, s.relationshipRepo, s.personRepo, personID)
 	if err == nil {
 		result.Siblings = siblings
 		for _, sib := range siblings {
@@ -318,11 +327,11 @@ func (s *personService) GetByIDWithRelationships(ctx context.Context, personID u
 	return result, nil
 }
 
-func (s *personService) GetAncestors(ctx context.Context, personID uuid.UUID) ([]domain.Person, error) {
+func (s *service) GetAncestors(ctx context.Context, personID uuid.UUID) ([]domain.Person, error) {
 	return s.getAncestorsRecursive(ctx, personID, 0, make(map[uuid.UUID]bool))
 }
 
-func (s *personService) getAncestorsRecursive(ctx context.Context, personID uuid.UUID, depth int, visited map[uuid.UUID]bool) ([]domain.Person, error) {
+func (s *service) getAncestorsRecursive(ctx context.Context, personID uuid.UUID, depth int, visited map[uuid.UUID]bool) ([]domain.Person, error) {
 	if depth >= 10 || visited[personID] {
 		return nil, nil
 	}
@@ -342,7 +351,7 @@ func (s *personService) getAncestorsRecursive(ctx context.Context, personID uuid
 			}
 
 			ancestors = append(ancestors, *parent)
-			
+
 			grandparents, err := s.getAncestorsRecursive(ctx, rel.PersonB, depth+1, visited)
 			if err == nil {
 				ancestors = append(ancestors, grandparents...)

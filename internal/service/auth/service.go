@@ -1,4 +1,4 @@
-package service
+package auth
 
 import (
 	"context"
@@ -16,6 +16,7 @@ import (
 	"silsilah-keluarga/internal/config"
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/repository"
+	"silsilah-keluarga/internal/service/email"
 )
 
 var (
@@ -28,7 +29,7 @@ var (
 	ErrVerificationTokenExpired = errors.New("email verification token has expired")
 )
 
-type AuthService interface {
+type Service interface {
 	Register(ctx context.Context, input domain.CreateUserInput) (*domain.User, *domain.TokenPair, error)
 	Login(ctx context.Context, input domain.LoginInput) (*domain.User, *domain.TokenPair, error)
 	RefreshToken(ctx context.Context, refreshToken string) (*domain.TokenPair, error)
@@ -46,15 +47,15 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-type authService struct {
+type service struct {
 	userRepo       repository.UserRepository
 	sessionRepo    repository.SessionRepository
-	emailService   EmailService
+	emailService   email.Service
 	cfg            *config.Config
 }
 
-func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, emailService EmailService, cfg *config.Config) AuthService {
-	return &authService{
+func NewService(userRepo repository.UserRepository, sessionRepo repository.SessionRepository, emailService email.Service, cfg *config.Config) Service {
+	return &service{
 		userRepo:       userRepo,
 		sessionRepo:    sessionRepo,
 		emailService:   emailService,
@@ -62,7 +63,7 @@ func NewAuthService(userRepo repository.UserRepository, sessionRepo repository.S
 	}
 }
 
-func (s *authService) Register(ctx context.Context, input domain.CreateUserInput) (*domain.User, *domain.TokenPair, error) {
+func (s *service) Register(ctx context.Context, input domain.CreateUserInput) (*domain.User, *domain.TokenPair, error) {
 	exists, err := s.userRepo.ExistsByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, nil, err
@@ -111,7 +112,7 @@ func (s *authService) Register(ctx context.Context, input domain.CreateUserInput
 	return user, nil, nil
 }
 
-func (s *authService) Login(ctx context.Context, input domain.LoginInput) (*domain.User, *domain.TokenPair, error) {
+func (s *service) Login(ctx context.Context, input domain.LoginInput) (*domain.User, *domain.TokenPair, error) {
 	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	if err != nil {
 		return nil, nil, err
@@ -136,7 +137,7 @@ func (s *authService) Login(ctx context.Context, input domain.LoginInput) (*doma
 	return user, tokens, nil
 }
 
-func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*domain.TokenPair, error) {
+func (s *service) RefreshToken(ctx context.Context, refreshToken string) (*domain.TokenPair, error) {
 	tokenHash := hashToken(refreshToken)
 
 	session, err := s.sessionRepo.GetByTokenHash(ctx, tokenHash)
@@ -162,7 +163,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*d
 	return s.generateTokenPair(ctx, user)
 }
 
-func (s *authService) ValidateAccessToken(tokenString string) (*Claims, error) {
+func (s *service) ValidateAccessToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.cfg.JWTSecret), nil
 	})
@@ -179,11 +180,11 @@ func (s *authService) ValidateAccessToken(tokenString string) (*Claims, error) {
 	return claims, nil
 }
 
-func (s *authService) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
+func (s *service) GetUserByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	return s.userRepo.GetByID(ctx, id)
 }
 
-func (s *authService) generateTokenPair(ctx context.Context, user *domain.User) (*domain.TokenPair, error) {
+func (s *service) generateTokenPair(ctx context.Context, user *domain.User) (*domain.TokenPair, error) {
 	accessClaims := &Claims{
 		UserID: user.ID,
 		Email:  user.Email,
@@ -221,7 +222,7 @@ func (s *authService) generateTokenPair(ctx context.Context, user *domain.User) 
 	}, nil
 }
 
-func (s *authService) RequestPasswordReset(ctx context.Context, email string) error {
+func (s *service) RequestPasswordReset(ctx context.Context, email string) error {
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
 		return err
@@ -252,7 +253,7 @@ func (s *authService) RequestPasswordReset(ctx context.Context, email string) er
 	return nil
 }
 
-func (s *authService) ResetPassword(ctx context.Context, token, newPassword string) error {
+func (s *service) ResetPassword(ctx context.Context, token, newPassword string) error {
 	user, err := s.userRepo.GetUserByResetToken(ctx, token)
 	if err != nil {
 		return err
@@ -282,7 +283,7 @@ func (s *authService) ResetPassword(ctx context.Context, token, newPassword stri
 	return nil
 }
 
-func (s *authService) VerifyEmail(ctx context.Context, token string) error {
+func (s *service) VerifyEmail(ctx context.Context, token string) error {
 	user, err := s.userRepo.GetUserByEmailVerificationToken(ctx, token)
 	if err != nil {
 		return err
@@ -302,8 +303,8 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) error {
 	return nil
 }
 
-func (s *authService) ResendVerificationEmail(ctx context.Context, email string) error {
-	user, err := s.userRepo.GetByEmail(ctx, email)
+func (s *service) ResendVerificationEmail(ctx context.Context, emailAddr string) error {
+	user, err := s.userRepo.GetByEmail(ctx, emailAddr)
 	if err != nil {
 		return err
 	}

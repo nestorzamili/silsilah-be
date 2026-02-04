@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -14,11 +15,16 @@ import (
 type PersonRepository interface {
 	Create(ctx context.Context, person *domain.Person) error
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Person, error)
+	GetByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Person, error)
 	Update(ctx context.Context, person *domain.Person) error
 	Delete(ctx context.Context, id uuid.UUID) error
 	List(ctx context.Context, params domain.PaginationParams) ([]domain.Person, int64, error)
 	Search(ctx context.Context, query string, limit int) ([]domain.Person, error)
 	GetAll(ctx context.Context) ([]domain.Person, error)
+	CountAll(ctx context.Context) (int64, error)
+	CountLiving(ctx context.Context) (int64, error)
+	CountOrphans(ctx context.Context) (int64, error)
+	GetLastActivityAt(ctx context.Context) (*time.Time, error)
 }
 
 type personRepository struct {
@@ -31,7 +37,7 @@ func NewPersonRepository(db *sqlx.DB) PersonRepository {
 
 func (r *personRepository) Create(ctx context.Context, person *domain.Person) error {
 	query := `
-		INSERT INTO persons (id, first_name, last_name, nickname, gender, 
+		INSERT INTO persons (person_id, first_name, last_name, nickname, gender, 
 			birth_date, birth_place, death_date, death_place, bio, avatar_url, 
 			occupation, religion, nationality, education, phone, email, address,
 			is_alive, created_by)
@@ -50,7 +56,7 @@ func (r *personRepository) Create(ctx context.Context, person *domain.Person) er
 
 func (r *personRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Person, error) {
 	var person domain.Person
-	query := `SELECT * FROM persons WHERE id = $1 AND deleted_at IS NULL`
+	query := `SELECT * FROM persons WHERE person_id = $1 AND deleted_at IS NULL`
 
 	err := r.db.GetContext(ctx, &person, query, id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -62,6 +68,22 @@ func (r *personRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.P
 	return &person, nil
 }
 
+func (r *personRepository) GetByIDs(ctx context.Context, ids []uuid.UUID) ([]domain.Person, error) {
+	if len(ids) == 0 {
+		return []domain.Person{}, nil
+	}
+
+	query, args, err := sqlx.In(`SELECT * FROM persons WHERE person_id IN (?) AND deleted_at IS NULL`, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	query = r.db.Rebind(query)
+	var persons []domain.Person
+	err = r.db.SelectContext(ctx, &persons, query, args...)
+	return persons, err
+}
+
 func (r *personRepository) Update(ctx context.Context, person *domain.Person) error {
 	query := `
 		UPDATE persons 
@@ -70,7 +92,7 @@ func (r *personRepository) Update(ctx context.Context, person *domain.Person) er
 			bio = $10, avatar_url = $11, occupation = $12, religion = $13,
 			nationality = $14, education = $15, phone = $16, email = $17,
 			address = $18, is_alive = $19, updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE person_id = $1 AND deleted_at IS NULL
 		RETURNING updated_at`
 
 	return r.db.QueryRowxContext(ctx, query,
@@ -83,7 +105,7 @@ func (r *personRepository) Update(ctx context.Context, person *domain.Person) er
 }
 
 func (r *personRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE persons SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+	query := `UPDATE persons SET deleted_at = NOW() WHERE person_id = $1 AND deleted_at IS NULL`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
@@ -137,4 +159,36 @@ func (r *personRepository) GetAll(ctx context.Context) ([]domain.Person, error) 
 	var persons []domain.Person
 	err := r.db.SelectContext(ctx, &persons, query)
 	return persons, err
+}
+
+func (r *personRepository) CountAll(ctx context.Context) (int64, error) {
+	var count int64
+	query := `SELECT COUNT(*) FROM persons WHERE deleted_at IS NULL`
+	err := r.db.GetContext(ctx, &count, query)
+	return count, err
+}
+
+func (r *personRepository) CountLiving(ctx context.Context) (int64, error) {
+	var count int64
+	query := `SELECT COUNT(*) FROM persons WHERE is_alive = true AND deleted_at IS NULL`
+	err := r.db.GetContext(ctx, &count, query)
+	return count, err
+}
+
+func (r *personRepository) CountOrphans(ctx context.Context) (int64, error) {
+	var count int64
+	query := `
+		SELECT COUNT(p.person_id) 
+		FROM persons p
+		LEFT JOIN relationships r ON p.person_id = r.person_a OR p.person_id = r.person_b
+		WHERE p.deleted_at IS NULL AND r.relationship_id IS NULL`
+	err := r.db.GetContext(ctx, &count, query)
+	return count, err
+}
+
+func (r *personRepository) GetLastActivityAt(ctx context.Context) (*time.Time, error) {
+	var t *time.Time
+	query := `SELECT MAX(updated_at) FROM persons`
+	err := r.db.GetContext(ctx, &t, query)
+	return t, err
 }

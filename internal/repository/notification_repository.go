@@ -39,7 +39,7 @@ func (r *notificationRepository) Create(ctx context.Context, notif *domain.Notif
 
 func (r *notificationRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Notification, error) {
 	var notif domain.Notification
-	query := `SELECT * FROM notifications WHERE id = $1`
+	query := `SELECT * FROM notifications WHERE notification_id = $1`
 	err := r.db.GetContext(ctx, &notif, query, id)
 	return &notif, err
 }
@@ -80,7 +80,7 @@ func (r *notificationRepository) ListByUser(ctx context.Context, userID uuid.UUI
 }
 
 func (r *notificationRepository) MarkAsRead(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE notifications SET is_read = true, read_at = NOW() WHERE id = $1 AND is_read = false`
+	query := `UPDATE notifications SET is_read = true, read_at = NOW() WHERE notification_id = $1 AND is_read = false`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }

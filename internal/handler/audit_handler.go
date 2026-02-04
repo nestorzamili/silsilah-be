@@ -3,17 +3,15 @@ package handler
 import (
 	"github.com/gofiber/fiber/v2"
 
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/audit"
 )
 
 type AuditHandler struct {
-	auditService service.AuditService
+	auditService audit.Service
 }
 
-func NewAuditHandler(auditService service.AuditService) *AuditHandler {
-	return &AuditHandler{
-		auditService: auditService,
-	}
+func NewAuditHandler(auditService audit.Service) *AuditHandler {
+	return &AuditHandler{auditService: auditService}
 }
 
 func (h *AuditHandler) GetRecentActivities(c *fiber.Ctx) error {

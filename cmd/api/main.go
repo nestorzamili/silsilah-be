@@ -13,13 +13,19 @@ import (
 	"silsilah-keluarga/internal/config"
 	"silsilah-keluarga/internal/handler"
 	"silsilah-keluarga/internal/middleware"
+	"silsilah-keluarga/internal/pkg/i18n"
 	"silsilah-keluarga/internal/repository"
 	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/auth"
 )
 
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
+	}
+
+	if err := i18n.LoadTranslations("locales"); err != nil {
+		log.Printf("Warning: Failed to load translations: %v", err)
 	}
 
 	cfg := config.Load()
@@ -61,7 +67,6 @@ func main() {
 		AllowMethods: "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 	}))
 
-	// Add middleware to extract real IP (for Cloudflare) and User-Agent
 	app.Use(middleware.RequestInfo())
 
 	setupRoutes(app, handlers, services.Auth)
@@ -77,7 +82,7 @@ func main() {
 	}
 }
 
-func setupRoutes(app *fiber.App, h *handler.Handlers, authService service.AuthService) {
+func setupRoutes(app *fiber.App, h *handler.Handlers, authService auth.Service) {
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
@@ -126,6 +131,7 @@ func setupRoutes(app *fiber.App, h *handler.Handlers, authService service.AuthSe
 	graph.Get("/ancestors/:personId/split", h.Graph.GetSplitAncestors)
 	graph.Get("/descendants/:personId", h.Graph.GetDescendants)
 	graph.Get("/path", h.Graph.FindRelationshipPath)
+	graph.Post("/resolve", h.Graph.ResolveRelationship)
 
 	changeRequests := protected.Group("/change-requests")
 	changeRequests.Post("/", h.ChangeRequest.Create)
@@ -154,4 +160,11 @@ func setupRoutes(app *fiber.App, h *handler.Handlers, authService service.AuthSe
 
 	audit := protected.Group("/audit")
 	audit.Get("/recent", h.Audit.GetRecentActivities)
+
+	dashboard := protected.Group("/dashboard")
+	dashboard.Get("/stats", h.Dashboard.GetStats)
+
+	export := protected.Group("/export")
+	export.Get("/json/:personId", h.Export.ExportJSON)
+	export.Get("/gedcom/:personId", h.Export.ExportGEDCOM)
 }

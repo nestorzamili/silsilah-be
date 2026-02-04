@@ -7,14 +7,14 @@ import (
 )
 
 type User struct {
-	ID                      uuid.UUID  `json:"id" db:"id"`
+	ID                      uuid.UUID  `json:"id" db:"user_id"`
 	Email                   string     `json:"email" db:"email"`
 	PasswordHash            string     `json:"-" db:"password_hash"`
 	FullName                string     `json:"full_name" db:"full_name"`
 	AvatarURL               *string    `json:"avatar_url,omitempty" db:"avatar_url"`
 	Bio                     *string    `json:"bio,omitempty" db:"bio"`
 	Role                    string     `json:"role" db:"role"`
-	PersonID                *uuid.UUID `json:"person_id" db:"person_id"`
+	PersonID                *uuid.UUID `json:"person_id" db:"linked_person_id"`
 	IsActive                bool       `json:"is_active" db:"is_active"`
 	IsEmailVerified         bool       `json:"is_email_verified" db:"is_email_verified"`
 	EmailVerificationToken  *string    `json:"-" db:"email_verification_token"`

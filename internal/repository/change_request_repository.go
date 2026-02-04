@@ -14,6 +14,7 @@ type ChangeRequestRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.ChangeRequest, error)
 	List(ctx context.Context, status *domain.ChangeRequestStatus, params domain.PaginationParams) ([]domain.ChangeRequest, int64, error)
 	UpdateStatus(ctx context.Context, id uuid.UUID, status domain.ChangeRequestStatus, reviewedBy uuid.UUID, note *string) error
+	CountPending(ctx context.Context) (int64, error)
 }
 
 type changeRequestRepository struct {
@@ -26,7 +27,7 @@ func NewChangeRequestRepository(db *sqlx.DB) ChangeRequestRepository {
 
 func (r *changeRequestRepository) Create(ctx context.Context, req *domain.ChangeRequest) error {
 	query := `
-		INSERT INTO change_requests (id, requested_by, entity_type, entity_id, action, payload, requester_note, status)
+		INSERT INTO change_requests (request_id, requested_by, entity_type, entity_id, action, payload, requester_note, status)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING created_at, updated_at`
 
@@ -38,7 +39,7 @@ func (r *changeRequestRepository) Create(ctx context.Context, req *domain.Change
 
 func (r *changeRequestRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.ChangeRequest, error) {
 	var req domain.ChangeRequest
-	query := `SELECT * FROM change_requests WHERE id = $1`
+	query := `SELECT * FROM change_requests WHERE request_id = $1`
 	err := r.db.GetContext(ctx, &req, query, id)
 	return &req, err
 }
@@ -81,7 +82,14 @@ func (r *changeRequestRepository) UpdateStatus(ctx context.Context, id uuid.UUID
 	query := `
 		UPDATE change_requests 
 		SET status = $2, reviewed_by = $3, reviewed_at = NOW(), review_note = $4, updated_at = NOW()
-		WHERE id = $1`
+		WHERE request_id = $1`
 	_, err := r.db.ExecContext(ctx, query, id, status, reviewedBy, note)
 	return err
+}
+
+func (r *changeRequestRepository) CountPending(ctx context.Context) (int64, error) {
+	var count int64
+	query := `SELECT COUNT(*) FROM change_requests WHERE status = 'PENDING'`
+	err := r.db.GetContext(ctx, &count, query)
+	return count, err
 }

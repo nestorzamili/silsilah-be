@@ -2,6 +2,7 @@ package domain
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -65,7 +66,7 @@ func (n *NullableGender) UnmarshalJSON(data []byte) error {
 }
 
 type Person struct {
-	ID         uuid.UUID  `json:"id" db:"id"`
+	ID         uuid.UUID  `json:"id" db:"person_id"`
 	FirstName  string     `json:"first_name" db:"first_name"`
 	LastName   *string    `json:"last_name,omitempty" db:"last_name"`
 	Nickname   *string    `json:"nickname,omitempty" db:"nickname"`
@@ -96,6 +97,10 @@ const (
 	GenderMale    Gender = "MALE"
 	GenderFemale  Gender = "FEMALE"
 	GenderUnknown Gender = "UNKNOWN"
+)
+
+var (
+	ErrPersonNotFound = errors.New("person not found")
 )
 
 func (g Gender) IsValid() bool {

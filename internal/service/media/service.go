@@ -1,4 +1,4 @@
-package service
+package media
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 	"silsilah-keluarga/internal/repository"
 )
 
-type MediaService interface {
+type Service interface {
 	Upload(ctx context.Context, userID uuid.UUID, personID *uuid.UUID, caption *string, fileName string, fileSize int64, mimeType string, reader io.Reader, status string) (*domain.Media, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.Media, error)
 	Delete(ctx context.Context, id uuid.UUID) error
@@ -23,21 +23,21 @@ type MediaService interface {
 	Approve(ctx context.Context, id uuid.UUID) error
 }
 
-type mediaService struct {
+type service struct {
 	mediaRepo   repository.MediaRepository
 	minioClient *minio.Client
 	cfg         *config.Config
 }
 
-func NewMediaService(mediaRepo repository.MediaRepository, minioClient *minio.Client, cfg *config.Config) MediaService {
-	return &mediaService{
+func NewService(mediaRepo repository.MediaRepository, minioClient *minio.Client, cfg *config.Config) Service {
+	return &service{
 		mediaRepo:   mediaRepo,
 		minioClient: minioClient,
 		cfg:         cfg,
 	}
 }
 
-func (s *mediaService) Upload(ctx context.Context, userID uuid.UUID, personID *uuid.UUID, caption *string, fileName string, fileSize int64, mimeType string, reader io.Reader, status string) (*domain.Media, error) {
+func (s *service) Upload(ctx context.Context, userID uuid.UUID, personID *uuid.UUID, caption *string, fileName string, fileSize int64, mimeType string, reader io.Reader, status string) (*domain.Media, error) {
 	mediaID := uuid.New()
 	storagePath := fmt.Sprintf("media/%s/%s", time.Now().Format("2006/01"), mediaID.String())
 
@@ -69,7 +69,7 @@ func (s *mediaService) Upload(ctx context.Context, userID uuid.UUID, personID *u
 	return media, nil
 }
 
-func (s *mediaService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Media, error) {
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*domain.Media, error) {
 	media, err := s.mediaRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (s *mediaService) GetByID(ctx context.Context, id uuid.UUID) (*domain.Media
 	return media, nil
 }
 
-func (s *mediaService) Delete(ctx context.Context, id uuid.UUID) error {
+func (s *service) Delete(ctx context.Context, id uuid.UUID) error {
 	media, err := s.mediaRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ func (s *mediaService) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (s *mediaService) List(ctx context.Context, personID *uuid.UUID, params domain.PaginationParams) (domain.PaginatedResponse[domain.Media], error) {
+func (s *service) List(ctx context.Context, personID *uuid.UUID, params domain.PaginationParams) (domain.PaginatedResponse[domain.Media], error) {
 	mediaList, total, err := s.mediaRepo.List(ctx, personID, params)
 	if err != nil {
 		return domain.PaginatedResponse[domain.Media]{}, err
@@ -105,7 +105,7 @@ func (s *mediaService) List(ctx context.Context, personID *uuid.UUID, params dom
 	return domain.NewPaginatedResponse(mediaList, params.Page, params.PageSize, total), nil
 }
 
-func (s *mediaService) getPublicURL(storagePath string) string {
+func (s *service) getPublicURL(storagePath string) string {
 	scheme := "http"
 	if s.cfg.MinIOPublicUseSSL {
 		scheme = "https"
@@ -113,7 +113,7 @@ func (s *mediaService) getPublicURL(storagePath string) string {
 	return fmt.Sprintf("%s://%s/%s/%s", scheme, s.cfg.MinIOPublicEndpoint, s.cfg.MinIOBucket, url.PathEscape(storagePath))
 }
 
-func (s *mediaService) Approve(ctx context.Context, id uuid.UUID) error {
+func (s *service) Approve(ctx context.Context, id uuid.UUID) error {
 	media, err := s.mediaRepo.GetByID(ctx, id)
 	if err != nil {
 		return err

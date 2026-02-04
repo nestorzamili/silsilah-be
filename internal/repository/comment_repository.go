@@ -27,12 +27,12 @@ func NewCommentRepository(db *sqlx.DB) CommentRepository {
 
 func (r *commentRepository) Create(ctx context.Context, comment *domain.Comment) error {
 	query := `
-		INSERT INTO comments (id, person_id, user_id, content)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO comments (comment_id, person_id, user_id, parent_id, content)
+		VALUES ($1, $2, $3, $4, $5)
 		RETURNING created_at, updated_at`
 
 	return r.db.QueryRowxContext(ctx, query,
-		comment.ID, comment.PersonID, comment.UserID, comment.Content,
+		comment.ID, comment.PersonID, comment.UserID, comment.ParentID, comment.Content,
 	).Scan(&comment.CreatedAt, &comment.UpdatedAt)
 }
 
@@ -56,7 +56,7 @@ func (r *commentRepository) Update(ctx context.Context, comment *domain.Comment)
 }
 
 func (r *commentRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE comments SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+	query := `UPDATE comments SET deleted_at = NOW() WHERE comment_id = $1 AND deleted_at IS NULL`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
@@ -72,10 +72,10 @@ func (r *commentRepository) ListByPerson(ctx context.Context, personID uuid.UUID
 
 	query := `
 		SELECT 
-			c.id, c.person_id, c.user_id, c.content, c.created_at, c.updated_at,
-			u.id as user_id, u.full_name as user_full_name, u.avatar_url as user_avatar_url
+			c.comment_id as id, c.person_id, c.user_id, c.parent_id, c.content, c.created_at, c.updated_at,
+			u.user_id as user_id, u.full_name as user_full_name, u.avatar_url as user_avatar_url
 		FROM comments c
-		INNER JOIN users u ON c.user_id = u.id
+		INNER JOIN users u ON c.user_id = u.user_id
 		WHERE c.person_id = $1 AND c.deleted_at IS NULL
 		ORDER BY c.created_at DESC
 		LIMIT $2 OFFSET $3`
@@ -91,7 +91,7 @@ func (r *commentRepository) ListByPerson(ctx context.Context, personID uuid.UUID
 		var c domain.Comment
 		var user domain.CommentUser
 		err := rows.Scan(
-			&c.ID, &c.PersonID, &c.UserID, &c.Content, &c.CreatedAt, &c.UpdatedAt,
+			&c.ID, &c.PersonID, &c.UserID, &c.ParentID, &c.Content, &c.CreatedAt, &c.UpdatedAt,
 			&user.ID, &user.FullName, &user.AvatarURL,
 		)
 		if err != nil {

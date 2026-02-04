@@ -1,33 +1,71 @@
 package handler
 
 import (
-	"strings"
+	"encoding/json"
+	"errors"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/changerequest"
+	"silsilah-keluarga/internal/service/person"
 )
 
 type PersonHandler struct {
-	personService service.PersonService
+	personService person.Service
+	crService     changerequest.Service
 }
 
-func NewPersonHandler(personService service.PersonService) *PersonHandler {
-	return &PersonHandler{personService: personService}
+func NewPersonHandler(personService person.Service, crService changerequest.Service) *PersonHandler {
+	return &PersonHandler{
+		personService: personService,
+		crService:     crService,
+	}
 }
 
 func (h *PersonHandler) Create(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return middleware.Unauthorized("User not authenticated")
+	}
 
 	var input domain.CreatePersonInput
 	if err := c.BodyParser(&input); err != nil {
 		return middleware.BadRequest("Invalid request body")
 	}
 
-	person, err := h.personService.Create(c.Context(), userID, input)
+	if user.Role == string(domain.RoleMember) {
+		payload, err := json.Marshal(input)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to marshal payload")
+		}
+
+		var requesterNote *string
+		if note := c.Query("requester_note"); note != "" {
+			requesterNote = &note
+		}
+
+		crInput := domain.CreateChangeRequestInput{
+			EntityType:    domain.EntityPerson,
+			Action:        domain.ActionCreate,
+			Payload:       payload,
+			RequesterNote: requesterNote,
+		}
+
+		cr, err := h.crService.Create(c.Context(), user.ID, crInput)
+		if err != nil {
+			return err
+		}
+
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+			"message":        "Create request submitted for approval",
+			"change_request": cr,
+		})
+	}
+
+	person, err := h.personService.Create(c.Context(), user.ID, input)
 	if err != nil {
 		return err
 	}
@@ -71,7 +109,7 @@ func (h *PersonHandler) Get(c *fiber.Ctx) error {
 
 	person, err := h.personService.GetByIDWithRelationships(c.Context(), personID)
 	if err != nil {
-		if err == service.ErrPersonNotFound {
+		if errors.Is(err, domain.ErrPersonNotFound) {
 			return middleware.NotFound("Person not found")
 		}
 		return err
@@ -87,15 +125,51 @@ func (h *PersonHandler) Update(c *fiber.Ctx) error {
 		return middleware.BadRequest("Invalid person ID")
 	}
 
-	userID := middleware.GetCurrentUserID(c)
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return middleware.Unauthorized("User not authenticated")
+	}
 
 	var input domain.UpdatePersonInput
 	if err := c.BodyParser(&input); err != nil {
 		return middleware.BadRequest("Invalid request body")
 	}
 
-	person, err := h.personService.Update(c.Context(), personID, userID, input)
+	if user.Role == string(domain.RoleMember) {
+		payload, err := json.Marshal(input)
+		if err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "Failed to marshal payload")
+		}
+
+		var requesterNote *string
+		if note := c.Query("requester_note"); note != "" {
+			requesterNote = &note
+		}
+
+		crInput := domain.CreateChangeRequestInput{
+			EntityType:    domain.EntityPerson,
+			EntityID:      &personID,
+			Action:        domain.ActionUpdate,
+			Payload:       payload,
+			RequesterNote: requesterNote,
+		}
+
+		cr, err := h.crService.Create(c.Context(), user.ID, crInput)
+		if err != nil {
+			return err
+		}
+
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+			"message":        "Update request submitted for approval",
+			"change_request": cr,
+		})
+	}
+
+	person, err := h.personService.Update(c.Context(), user.ID, personID, input)
 	if err != nil {
+		if errors.Is(err, domain.ErrPersonNotFound) {
+			return middleware.NotFound("Person not found")
+		}
 		return err
 	}
 
@@ -109,12 +183,41 @@ func (h *PersonHandler) Delete(c *fiber.Ctx) error {
 		return middleware.BadRequest("Invalid person ID")
 	}
 
-	if err := h.personService.Delete(c.Context(), personID); err != nil {
-		if err == service.ErrPersonNotFound {
-			return middleware.NotFound("Person not found")
+	user := middleware.GetCurrentUser(c)
+	if user == nil {
+		return middleware.Unauthorized("User not authenticated")
+	}
+
+	if user.Role == string(domain.RoleMember) {
+		payload := json.RawMessage("{}")
+
+		var requesterNote *string
+		if note := c.Query("requester_note"); note != "" {
+			requesterNote = &note
 		}
-		if strings.Contains(err.Error(), "database") || strings.Contains(err.Error(), "connection") || strings.Contains(err.Error(), "constraint") {
-			return middleware.NewError(fiber.StatusInternalServerError, "Failed to delete person")
+
+		crInput := domain.CreateChangeRequestInput{
+			EntityType:    domain.EntityPerson,
+			EntityID:      &personID,
+			Action:        domain.ActionDelete,
+			Payload:       payload,
+			RequesterNote: requesterNote,
+		}
+
+		cr, err := h.crService.Create(c.Context(), user.ID, crInput)
+		if err != nil {
+			return err
+		}
+
+		return c.Status(fiber.StatusAccepted).JSON(fiber.Map{
+			"message":        "Delete request submitted for approval",
+			"change_request": cr,
+		})
+	}
+
+	if err := h.personService.Delete(c.Context(), personID); err != nil {
+		if errors.Is(err, domain.ErrPersonNotFound) {
+			return middleware.NotFound("Person not found")
 		}
 		return err
 	}

@@ -1,4 +1,4 @@
-package service
+package graph
 
 import (
 	"context"
@@ -11,38 +11,43 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/repository"
+	"silsilah-keluarga/internal/service/narrative"
 )
 
-type GraphService interface {
+type Service interface {
 	GetFullGraph(ctx context.Context) (*domain.FamilyGraph, error)
 	GetAncestors(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.AncestorTree, error)
 	GetSplitAncestors(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.SplitAncestorTree, error)
 	GetDescendants(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.DescendantTree, error)
-	FindRelationshipPath(ctx context.Context, fromPersonID, toPersonID uuid.UUID) (*domain.RelationshipPath, error)
+	FindRelationshipPath(ctx context.Context, fromPersonID, toPersonID uuid.UUID, maxDepth int, locale string) (*domain.RelationshipPath, error)
 	InvalidateCache(ctx context.Context) error
 }
 
-type graphService struct {
+type service struct {
 	personRepo repository.PersonRepository
 	relRepo    repository.RelationshipRepository
 	redis      *redis.Client
+	narrative  narrative.Service
 }
 
-func NewGraphService(personRepo repository.PersonRepository, relRepo repository.RelationshipRepository, redis *redis.Client) GraphService {
-	return &graphService{
+func NewService(personRepo repository.PersonRepository, relRepo repository.RelationshipRepository, redis *redis.Client, narrative narrative.Service) Service {
+	return &service{
 		personRepo: personRepo,
 		relRepo:    relRepo,
 		redis:      redis,
+		narrative:  narrative,
 	}
 }
 
-func (s *graphService) GetFullGraph(ctx context.Context) (*domain.FamilyGraph, error) {
+func (s *service) GetFullGraph(ctx context.Context) (*domain.FamilyGraph, error) {
 	cacheKey := "family:graph"
 
-	if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
-		var graph domain.FamilyGraph
-		if json.Unmarshal([]byte(cached), &graph) == nil {
-			return &graph, nil
+	if s.redis != nil {
+		if cached, err := s.redis.Get(ctx, cacheKey).Result(); err == nil {
+			var graph domain.FamilyGraph
+			if json.Unmarshal([]byte(cached), &graph) == nil {
+				return &graph, nil
+			}
 		}
 	}
 
@@ -97,18 +102,20 @@ func (s *graphService) GetFullGraph(ctx context.Context) (*domain.FamilyGraph, e
 		},
 	}
 
-	if graphJSON, err := json.Marshal(graph); err == nil {
-		_ = s.redis.Set(ctx, cacheKey, graphJSON, 5*time.Minute).Err()
+	if s.redis != nil {
+		if graphJSON, err := json.Marshal(graph); err == nil {
+			_ = s.redis.Set(ctx, cacheKey, graphJSON, 5*time.Minute).Err()
+		}
 	}
 
 	return graph, nil
 }
 
-func (s *graphService) GetAncestors(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.AncestorTree, error) {
+func (s *service) GetAncestors(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.AncestorTree, error) {
 	return s.getAncestorTree(ctx, personID, maxDepth)
 }
 
-func (s *graphService) GetSplitAncestors(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.SplitAncestorTree, error) {
+func (s *service) GetSplitAncestors(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.SplitAncestorTree, error) {
 	if maxDepth <= 0 {
 		maxDepth = 10
 	}
@@ -158,10 +165,10 @@ func (s *graphService) GetSplitAncestors(ctx context.Context, personID uuid.UUID
 	return result, nil
 }
 
-func (s *graphService) getAncestorTree(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.AncestorTree, error) {
+func (s *service) getAncestorTree(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.AncestorTree, error) {
 	maxDepth = clampDepth(maxDepth)
 
-	ancestors, err := s.relRepo.GetAncestors(ctx, personID, maxDepth)
+	ancestors, err := BFSAncestors(ctx, s.relRepo, s.personRepo, personID, maxDepth)
 	if err != nil {
 		return nil, err
 	}
@@ -196,8 +203,8 @@ func (s *graphService) getAncestorTree(ctx context.Context, personID uuid.UUID, 
 	}, nil
 }
 
-func (s *graphService) getAncestorTreeForSide(ctx context.Context, personID, parentID uuid.UUID, maxDepth int) (*domain.AncestorTree, error) {
-	ancestors, err := s.relRepo.GetAncestors(ctx, parentID, maxDepth-1)
+func (s *service) getAncestorTreeForSide(ctx context.Context, personID, parentID uuid.UUID, maxDepth int) (*domain.AncestorTree, error) {
+	ancestors, err := BFSAncestors(ctx, s.relRepo, s.personRepo, parentID, maxDepth-1)
 	if err != nil {
 		return nil, err
 	}
@@ -247,10 +254,10 @@ func (s *graphService) getAncestorTreeForSide(ctx context.Context, personID, par
 	}, nil
 }
 
-func (s *graphService) GetDescendants(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.DescendantTree, error) {
+func (s *service) GetDescendants(ctx context.Context, personID uuid.UUID, maxDepth int) (*domain.DescendantTree, error) {
 	maxDepth = clampDepth(maxDepth)
 
-	descendants, err := s.relRepo.GetDescendants(ctx, personID, maxDepth)
+	descendants, err := BFSDescendants(ctx, s.relRepo, s.personRepo, personID, maxDepth)
 	if err != nil {
 		return nil, err
 	}
@@ -282,45 +289,60 @@ func (s *graphService) GetDescendants(ctx context.Context, personID uuid.UUID, m
 	}, nil
 }
 
-func (s *graphService) FindRelationshipPath(ctx context.Context, fromPersonID, toPersonID uuid.UUID) (*domain.RelationshipPath, error) {
-	commonAncestors, err := s.relRepo.FindCommonAncestors(ctx, fromPersonID, toPersonID)
+func (s *service) FindRelationshipPath(ctx context.Context, fromPersonID, toPersonID uuid.UUID, maxDepth int, locale string) (*domain.RelationshipPath, error) {
+	if maxDepth <= 0 {
+		maxDepth = 20
+	}
+	
+	pathIDs, err := BFSShortestPath(ctx, s.relRepo, fromPersonID, toPersonID, maxDepth)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(commonAncestors) == 0 {
+	if len(pathIDs) == 0 {
 		return nil, nil
 	}
 
-	closest := commonAncestors[0]
-
-	var relationship domain.DerivedRelationType
-	var description string
-
-	switch closest.TotalDegree {
-	case 2:
-		relationship = domain.DerivedSibling
-		description = "Siblings"
-	case 3:
-		relationship = domain.DerivedUncleAunt
-		description = "Uncle/Aunt - Nephew/Niece"
-	case 4:
-		relationship = domain.DerivedCousin
-		description = "First Cousins"
-	default:
-		description = fmt.Sprintf("Related (degree %d)", closest.TotalDegree)
-	}
-
-	return &domain.RelationshipPath{
+	degree := len(pathIDs) - 1
+	
+	pathObj := &domain.RelationshipPath{
 		FromPerson:   fromPersonID,
 		ToPerson:     toPersonID,
-		Path:         []uuid.UUID{closest.AncestorID},
-		Relationship: relationship,
-		Description:  description,
-		Degree:       closest.TotalDegree,
-	}, nil
+		Path:         pathIDs,
+		Relationship: domain.DerivedRelationType("custom"),
+		Degree:       degree,
+	}
+
+	if s.narrative != nil {
+		pathObj.Description = s.narrative.DescribeRelationship(ctx, pathObj, locale)
+	} else {
+		pathObj.Description = fmt.Sprintf("Related (degree %d)", degree)
+		if degree == 0 {
+			pathObj.Description = "Self"
+		}
+	}
+
+	return pathObj, nil
 }
 
-func (s *graphService) InvalidateCache(ctx context.Context) error {
+func (s *service) InvalidateCache(ctx context.Context) error {
 	return s.redis.Del(ctx, "family:graph").Err()
+}
+
+func (s *service) fetchAndBuildEdges(ctx context.Context, personIds []uuid.UUID, personIdSet map[uuid.UUID]bool) ([]domain.GraphEdge, error) {
+	rels, err := s.relRepo.ListByPeople(ctx, personIds)
+	if err != nil {
+		return nil, err
+	}
+	return buildEdgesForNodes(rels, personIdSet), nil
+}
+
+func clampDepth(d int) int {
+	if d <= 0 {
+		return 5
+	}
+	if d > 20 {
+		return 20
+	}
+	return d
 }

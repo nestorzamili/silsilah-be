@@ -8,7 +8,7 @@ import (
 )
 
 type ChangeRequest struct {
-	ID            uuid.UUID           `json:"id" db:"id"`
+	ID            uuid.UUID           `json:"id" db:"request_id"`
 	RequestedBy   uuid.UUID           `json:"requested_by" db:"requested_by"`
 	EntityType    EntityType          `json:"entity_type" db:"entity_type"`
 	EntityID      *uuid.UUID          `json:"entity_id,omitempty" db:"entity_id"`

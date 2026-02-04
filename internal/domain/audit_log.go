@@ -8,7 +8,7 @@ import (
 )
 
 type AuditLog struct {
-	ID         uuid.UUID       `json:"id" db:"id"`
+	ID         uuid.UUID       `json:"id" db:"log_id"`
 	UserID     uuid.UUID       `json:"user_id" db:"user_id"`
 	UserName   *string         `json:"user_name,omitempty" db:"user_name"`
 	Action     string          `json:"action" db:"action"`

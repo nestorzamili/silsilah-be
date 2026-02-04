@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"silsilah-keluarga/internal/domain"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/auth"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 	UserAgentContextKey = "user_agent"
 )
 
-func AuthRequired(authService service.AuthService) fiber.Handler {
+func AuthRequired(authService auth.Service) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {
@@ -67,12 +67,12 @@ func GetCurrentUser(c *fiber.Ctx) *domain.User {
 	return user
 }
 
-func GetCurrentUserID(c *fiber.Ctx) uuid.UUID {
+func GetUserID(c *fiber.Ctx) (uuid.UUID, error) {
 	userID, ok := c.Locals(UserIDContextKey).(uuid.UUID)
 	if !ok {
-		return uuid.Nil
+		return uuid.Nil, fiber.NewError(fiber.StatusUnauthorized, "User ID not found in context")
 	}
-	return userID
+	return userID, nil
 }
 
 func GetRealIP(c *fiber.Ctx) string {

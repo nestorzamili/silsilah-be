@@ -12,7 +12,7 @@ import (
 )
 
 type Session struct {
-	ID        uuid.UUID  `db:"id"`
+	ID        uuid.UUID  `db:"session_id"`
 	UserID    uuid.UUID  `db:"user_id"`
 	TokenHash string     `db:"token_hash"`
 	UserAgent *string    `db:"user_agent"`
@@ -41,7 +41,7 @@ func NewSessionRepository(db *sqlx.DB) SessionRepository {
 
 func (r *sessionRepository) Create(ctx context.Context, session *Session) error {
 	query := `
-		INSERT INTO sessions (id, user_id, token_hash, user_agent, ip_address, expires_at)
+		INSERT INTO sessions (session_id, user_id, token_hash, user_agent, ip_address, expires_at)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		RETURNING created_at`
 
@@ -76,7 +76,7 @@ func (r *sessionRepository) GetByUserID(ctx context.Context, userID uuid.UUID) (
 }
 
 func (r *sessionRepository) Revoke(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE sessions SET revoked_at = NOW() WHERE id = $1 AND revoked_at IS NULL`
+	query := `UPDATE sessions SET revoked_at = NOW() WHERE session_id = $1 AND revoked_at IS NULL`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }

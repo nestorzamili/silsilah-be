@@ -10,23 +10,27 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/changerequest"
+	"silsilah-keluarga/internal/service/media"
 )
 
 type MediaHandler struct {
-	mediaService         service.MediaService
-	changeRequestService service.ChangeRequestService
+	mediaService media.Service
+	crService    changerequest.Service
 }
 
-func NewMediaHandler(mediaService service.MediaService, changeRequestService service.ChangeRequestService) *MediaHandler {
+func NewMediaHandler(mediaService media.Service, crService changerequest.Service) *MediaHandler {
 	return &MediaHandler{
-		mediaService:         mediaService,
-		changeRequestService: changeRequestService,
+		mediaService: mediaService,
+		crService:    crService,
 	}
 }
 
 func (h *MediaHandler) Upload(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 	currentUser := middleware.GetCurrentUser(c)
 	if currentUser == nil {
 		return middleware.Unauthorized("User not authenticated")
@@ -89,7 +93,7 @@ func (h *MediaHandler) Upload(c *fiber.Ctx) error {
 			RequesterNote: requesterNote,
 		}
 
-		request, err := h.changeRequestService.Create(c.Context(), userID, input)
+		request, err := h.crService.Create(c.Context(), userID, input)
 		if err != nil {
 			return err
 		}
@@ -176,7 +180,7 @@ func (h *MediaHandler) Delete(c *fiber.Ctx) error {
 			RequesterNote: requesterNote,
 		}
 
-		request, err := h.changeRequestService.Create(c.Context(), currentUser.ID, input)
+		request, err := h.crService.Create(c.Context(), currentUser.ID, input)
 		if err != nil {
 			return err
 		}

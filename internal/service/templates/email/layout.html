@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>{{.Title}}</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+
+	<!-- Header -->
+	<div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+		<h1 style="color: #ffffff; margin: 0; font-size: 28px;">
+			Silsilah Keluarga
+		</h1>
+		<p style="color: #d1fae5; margin: 10px 0 0 0; font-size: 16px;">
+			Menghubungkan Generasi, Menjaga Kisah Keluarga Kita
+		</p>
+	</div>
+
+	<!-- Content -->
+	<div style="background-color: #ffffff; padding: 30px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+        {{template "content" .}}
+		
+		<hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
+
+		<p style="font-size: 14px; color: #6b7280;">
+			Salam hangat,<br>
+			<strong>Tim Silsilah Keluarga</strong>
+		</p>
+	</div>
+
+	<!-- Footer -->
+	<div style="text-align: center; margin-top: 20px; font-size: 12px; color: #9ca3af;">
+		<p>
+			Dibuat oleh
+			<a href="https://zamili.dev" style="color: #9ca3af; text-decoration: underline;">
+				Nestor Zamili
+			</a>
+		</p>
+		<p>
+			© 2026 Silsilah Keluarga. Hak cipta dilindungi.
+		</p>
+	</div>
+
+</body>
+</html>

@@ -1,0 +1,39 @@
+{{define "content"}}
+		<h2 style="color: #111827; margin-top: 0;">
+			Halo, {{.Name}}!
+		</h2>
+
+		<p>
+			Terima kasih telah bergabung dengan <strong>Silsilah Keluarga</strong>.
+			Bersama, kita membangun silsilah keluarga kita untuk menghubungkan generasi dan melestarikan kisah keluarga kita.
+		</p>
+
+		<div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+			<h3 style="margin-top: 0; color: #111827;">
+				Informasi Akun
+			</h3>
+			<div style="margin-bottom: 10px;">
+				<strong>Email:</strong> {{.Email}}
+			</div>
+			<div>
+				<strong>Nama:</strong> {{.Name}}
+			</div>
+		</div>
+
+		<p>
+			Akun Anda telah berhasil dibuat. Sekarang Anda dapat mulai membangun pohon keluarga, 
+			menghubungkan kerabat, dan melestarikan sejarah keluarga Anda.
+		</p>
+
+		<!-- Button -->
+		<div style="text-align: center; margin: 30px 0;">
+			<a href="{{.Link}}"
+			   style="background-color: #10b981; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+				Masuk ke Akun Anda
+			</a>
+		</div>
+
+		<p style="font-size: 14px; color: #6b7280;">
+			Jika Anda memiliki pertanyaan atau membutuhkan bantuan, jangan ragu untuk menghubungi tim dukungan kami.
+		</p>
+{{end}}

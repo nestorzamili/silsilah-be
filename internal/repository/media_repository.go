@@ -27,7 +27,7 @@ func NewMediaRepository(db *sqlx.DB) MediaRepository {
 
 func (r *mediaRepository) Create(ctx context.Context, media *domain.Media) error {
 	query := `
-		INSERT INTO media (id, person_id, uploaded_by, file_name, file_size, mime_type, storage_path, caption, status, taken_at)
+		INSERT INTO media (media_id, person_id, uploaded_by, file_name, file_size, mime_type, storage_path, caption, status, taken_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING created_at`
 
@@ -40,7 +40,7 @@ func (r *mediaRepository) Create(ctx context.Context, media *domain.Media) error
 
 func (r *mediaRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.Media, error) {
 	var media domain.Media
-	query := `SELECT * FROM media WHERE id = $1 AND deleted_at IS NULL`
+	query := `SELECT * FROM media WHERE media_id = $1 AND deleted_at IS NULL`
 	err := r.db.GetContext(ctx, &media, query, id)
 	return &media, err
 }
@@ -49,13 +49,13 @@ func (r *mediaRepository) Update(ctx context.Context, media *domain.Media) error
 	query := `
 		UPDATE media 
 		SET status = $1, caption = $2, person_id = $3
-		WHERE id = $4 AND deleted_at IS NULL`
+		WHERE media_id = $4 AND deleted_at IS NULL`
 	_, err := r.db.ExecContext(ctx, query, media.Status, media.Caption, media.PersonID, media.ID)
 	return err
 }
 
 func (r *mediaRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE media SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+	query := `UPDATE media SET deleted_at = NOW() WHERE media_id = $1 AND deleted_at IS NULL`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }

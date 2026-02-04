@@ -6,15 +6,16 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/person"
+	"silsilah-keluarga/internal/service/user"
 )
 
 type UserHandler struct {
-	userService   service.UserService
-	personService service.PersonService
+	userService   user.Service
+	personService person.Service
 }
 
-func NewUserHandler(userService service.UserService, personService service.PersonService) *UserHandler {
+func NewUserHandler(userService user.Service, personService person.Service) *UserHandler {
 	return &UserHandler{
 		userService:   userService,
 		personService: personService,
@@ -30,7 +31,10 @@ func (h *UserHandler) GetProfile(c *fiber.Ctx) error {
 }
 
 func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 
 	var input domain.UpdateUserInput
 	if err := c.BodyParser(&input); err != nil {
@@ -64,13 +68,13 @@ func (h *UserHandler) AssignRole(c *fiber.Ctx) error {
 	}
 
 	if err := h.userService.AssignRole(c.Context(), current_user, input); err != nil {
-		if err == service.ErrInsufficientPermissions {
+		if err == user.ErrInsufficientPermissions {
 			return middleware.Forbidden("Insufficient permissions to assign roles")
 		}
-		if err == service.ErrCannotModifySelf {
+		if err == user.ErrCannotModifySelf {
 			return middleware.Forbidden("Cannot modify your own role")
 		}
-		if err == service.ErrUserNotFound {
+		if err == user.ErrUserNotFound {
 			return middleware.NotFound("User not found")
 		}
 		return err
@@ -126,13 +130,13 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	}
 
 	if err := h.userService.DeleteUser(c.Context(), currentUser, userID); err != nil {
-		if err == service.ErrInsufficientPermissions {
+		if err == user.ErrInsufficientPermissions {
 			return middleware.Forbidden("Insufficient permissions to delete user")
 		}
-		if err == service.ErrCannotModifySelf {
+		if err == user.ErrCannotModifySelf {
 			return middleware.Forbidden("Cannot delete your own account")
 		}
-		if err == service.ErrUserNotFound {
+		if err == user.ErrUserNotFound {
 			return middleware.NotFound("User not found")
 		}
 		return err

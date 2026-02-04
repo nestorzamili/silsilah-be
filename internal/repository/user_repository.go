@@ -41,7 +41,7 @@ func NewUserRepository(db *sqlx.DB) UserRepository {
 
 func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
 	query := `
-		INSERT INTO users (id, email, password_hash, full_name, avatar_url, bio, role, is_active, is_email_verified)
+		INSERT INTO users (user_id, email, password_hash, full_name, avatar_url, bio, role, is_active, is_email_verified)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at, updated_at`
 
@@ -53,7 +53,7 @@ func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
 
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (*domain.User, error) {
 	var user domain.User
-	query := `SELECT * FROM users WHERE id = $1 AND deleted_at IS NULL`
+	query := `SELECT * FROM users WHERE user_id = $1 AND deleted_at IS NULL`
 
 	err := r.db.GetContext(ctx, &user, query, id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -84,15 +84,15 @@ func (r *userRepository) Update(ctx context.Context, user *domain.User) error {
 		UPDATE users 
 		SET email = :email, password_hash = :password_hash, full_name = :full_name, 
 			avatar_url = :avatar_url, bio = :bio, role = :role, 
-			person_id = :person_id, updated_at = NOW()
-		WHERE id = :id AND deleted_at IS NULL`
+			linked_person_id = :linked_person_id, updated_at = NOW()
+		WHERE user_id = :user_id AND deleted_at IS NULL`
 
 	_, err := r.db.NamedExecContext(ctx, query, user)
 	return err
 }
 
 func (r *userRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	query := `UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL`
+	query := `UPDATE users SET deleted_at = NOW() WHERE user_id = $1 AND deleted_at IS NULL`
 	_, err := r.db.ExecContext(ctx, query, id)
 	return err
 }
@@ -108,7 +108,7 @@ func (r *userRepository) AssignRole(ctx context.Context, userID uuid.UUID, role 
 	query := `
 		UPDATE users 
 		SET role = $2, updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE user_id = $1 AND deleted_at IS NULL
 		RETURNING updated_at`
 
 	var updatedAt time.Time
@@ -156,7 +156,7 @@ func (r *userRepository) SetPasswordResetToken(ctx context.Context, userID uuid.
 	query := `
 		UPDATE users 
 		SET password_reset_token = $2, password_reset_expires_at = $3, updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE user_id = $1 AND deleted_at IS NULL
 		RETURNING updated_at`
 
 	var updatedAt time.Time
@@ -185,7 +185,7 @@ func (r *userRepository) ClearPasswordResetToken(ctx context.Context, userID uui
 	query := `
 		UPDATE users 
 		SET password_reset_token = NULL, password_reset_expires_at = NULL, updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE user_id = $1 AND deleted_at IS NULL
 		RETURNING updated_at`
 
 	var updatedAt time.Time
@@ -200,7 +200,7 @@ func (r *userRepository) SetEmailVerificationToken(ctx context.Context, userID u
 	query := `
 		UPDATE users 
 		SET email_verification_token = $2, email_verification_sent_at = $3, updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE user_id = $1 AND deleted_at IS NULL
 		RETURNING updated_at`
 
 	var updatedAt time.Time
@@ -229,7 +229,7 @@ func (r *userRepository) VerifyEmail(ctx context.Context, userID uuid.UUID) erro
 	query := `
 		UPDATE users 
 		SET is_email_verified = TRUE, email_verification_token = NULL, email_verification_sent_at = NULL, updated_at = NOW()
-		WHERE id = $1 AND deleted_at IS NULL
+		WHERE user_id = $1 AND deleted_at IS NULL
 		RETURNING updated_at`
 
 	var updatedAt time.Time

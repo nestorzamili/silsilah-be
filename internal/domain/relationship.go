@@ -8,13 +8,11 @@ import (
 )
 
 type Relationship struct {
-	ID          uuid.UUID        `json:"id" db:"id"`
+	ID          uuid.UUID        `json:"id" db:"relationship_id"`
 	PersonA     uuid.UUID        `json:"person_a" db:"person_a"`
 	PersonB     uuid.UUID        `json:"person_b" db:"person_b"`
 	Type        RelationshipType `json:"type" db:"type"`
 	Metadata    json.RawMessage  `json:"metadata,omitempty" db:"metadata"`
-	SpouseOrder *int             `json:"spouse_order,omitempty" db:"spouse_order"` 
-	ChildOrder  *int             `json:"child_order,omitempty" db:"child_order"`   
 	CreatedBy   uuid.UUID        `json:"created_by" db:"created_by"`
 	CreatedAt   time.Time        `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time        `json:"updated_at" db:"updated_at"`
@@ -72,14 +70,10 @@ type CreateRelationshipInput struct {
 	PersonB     uuid.UUID        `json:"person_b" validate:"required"`
 	Type        RelationshipType `json:"type" validate:"required"`
 	Metadata    json.RawMessage  `json:"metadata,omitempty"`
-	SpouseOrder *int             `json:"spouse_order,omitempty"` 
-	ChildOrder  *int             `json:"child_order,omitempty"`  
 }
 
 type UpdateRelationshipInput struct {
 	Metadata    json.RawMessage `json:"metadata,omitempty"`
-	SpouseOrder *int            `json:"spouse_order,omitempty"`
-	ChildOrder  *int            `json:"child_order,omitempty"`
 }
 
 type DerivedRelationType string

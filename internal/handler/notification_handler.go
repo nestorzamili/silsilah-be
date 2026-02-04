@@ -7,21 +7,22 @@ import (
 	"github.com/google/uuid"
 
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/notification"
 )
 
 type NotificationHandler struct {
-	notificationService service.NotificationService
+	notifService notification.Service
 }
 
-func NewNotificationHandler(notificationService service.NotificationService) *NotificationHandler {
-	return &NotificationHandler{
-		notificationService: notificationService,
-	}
+func NewNotificationHandler(notifService notification.Service) *NotificationHandler {
+	return &NotificationHandler{notifService: notifService}
 }
 
 func (h *NotificationHandler) List(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 
 	page, _ := strconv.Atoi(c.Query("page", "1"))
 	pageSize, _ := strconv.Atoi(c.Query("page_size", "20"))
@@ -35,7 +36,7 @@ func (h *NotificationHandler) List(c *fiber.Ctx) error {
 		params.PageSize = pageSize
 	}
 
-	result, err := h.notificationService.List(c.Context(), userID, unreadOnly, params)
+	result, err := h.notifService.List(c.Context(), userID, unreadOnly, params)
 	if err != nil {
 		return err
 	}
@@ -44,9 +45,12 @@ func (h *NotificationHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *NotificationHandler) GetUnreadCount(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 
-	count, err := h.notificationService.GetUnreadCount(c.Context(), userID)
+	count, err := h.notifService.GetUnreadCount(c.Context(), userID)
 	if err != nil {
 		return err
 	}
@@ -63,7 +67,7 @@ func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
 		return middleware.BadRequest("Invalid notification ID")
 	}
 
-	if err := h.notificationService.MarkAsRead(c.Context(), notifID); err != nil {
+	if err := h.notifService.MarkAsRead(c.Context(), notifID); err != nil {
 		return err
 	}
 
@@ -71,9 +75,12 @@ func (h *NotificationHandler) MarkAsRead(c *fiber.Ctx) error {
 }
 
 func (h *NotificationHandler) MarkAllAsRead(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 
-	if err := h.notificationService.MarkAllAsRead(c.Context(), userID); err != nil {
+	if err := h.notifService.MarkAllAsRead(c.Context(), userID); err != nil {
 		return err
 	}
 

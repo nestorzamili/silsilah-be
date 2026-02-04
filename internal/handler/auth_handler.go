@@ -7,14 +7,14 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/auth"
 )
 
 type AuthHandler struct {
-	authService service.AuthService
+	authService auth.Service
 }
 
-func NewAuthHandler(authService service.AuthService) *AuthHandler {
+func NewAuthHandler(authService auth.Service) *AuthHandler {
 	return &AuthHandler{authService: authService}
 }
 
@@ -26,7 +26,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 
 	user, _, err := h.authService.Register(c.Context(), input)
 	if err != nil {
-		if err == service.ErrEmailExists {
+		if err == auth.ErrEmailExists {
 			return middleware.Conflict("Email already registered")
 		}
 		return err
@@ -46,10 +46,10 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 
 	user, tokens, err := h.authService.Login(c.Context(), input)
 	if err != nil {
-		if err == service.ErrInvalidCredentials {
+		if err == auth.ErrInvalidCredentials {
 			return middleware.Unauthorized("Invalid email or password")
 		}
-		if err == service.ErrEmailNotVerified {
+		if err == auth.ErrEmailNotVerified {
 			return middleware.Forbidden("Email not verified. Please verify your email first.")
 		}
 		return err
@@ -73,10 +73,10 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 
 	tokens, err := h.authService.RefreshToken(c.Context(), input.RefreshToken)
 	if err != nil {
-		if err == service.ErrInvalidToken {
+		if err == auth.ErrInvalidToken {
 			return middleware.Unauthorized("Invalid refresh token")
 		}
-		if err == service.ErrUserNotFound {
+		if err == auth.ErrUserNotFound {
 			return middleware.Unauthorized("User not found")
 		}
 		return err
@@ -121,7 +121,7 @@ func (h *AuthHandler) ResetPassword(c *fiber.Ctx) error {
 	}
 
 	if err := h.authService.ResetPassword(c.Context(), input.Token, input.NewPassword); err != nil {
-		if err == service.ErrInvalidToken || err == service.ErrTokenExpired {
+		if err == auth.ErrInvalidToken || err == auth.ErrTokenExpired {
 			return middleware.BadRequest("Invalid or expired reset token")
 		}
 		return err
@@ -139,7 +139,7 @@ func (h *AuthHandler) VerifyEmail(c *fiber.Ctx) error {
 	}
 
 	if err := h.authService.VerifyEmail(c.Context(), token); err != nil {
-		if err == service.ErrInvalidToken || err == service.ErrVerificationTokenExpired {
+		if err == auth.ErrInvalidToken || err == auth.ErrVerificationTokenExpired {
 			return middleware.BadRequest("Invalid or expired verification token")
 		}
 		return err

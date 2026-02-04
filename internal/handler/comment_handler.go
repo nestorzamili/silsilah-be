@@ -6,19 +6,22 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/middleware"
-	"silsilah-keluarga/internal/service"
+	"silsilah-keluarga/internal/service/comment"
 )
 
 type CommentHandler struct {
-	commentService service.CommentService
+	commentService comment.Service
 }
 
-func NewCommentHandler(commentService service.CommentService) *CommentHandler {
+func NewCommentHandler(commentService comment.Service) *CommentHandler {
 	return &CommentHandler{commentService: commentService}
 }
 
 func (h *CommentHandler) Create(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 
 	personIDStr := c.Params("personId")
 	personID, err := uuid.Parse(personIDStr)
@@ -57,7 +60,10 @@ func (h *CommentHandler) List(c *fiber.Ctx) error {
 }
 
 func (h *CommentHandler) Update(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 	commentIDStr := c.Params("commentId")
 	commentID, err := uuid.Parse(commentIDStr)
 	if err != nil {
@@ -78,7 +84,10 @@ func (h *CommentHandler) Update(c *fiber.Ctx) error {
 }
 
 func (h *CommentHandler) Delete(c *fiber.Ctx) error {
-	userID := middleware.GetCurrentUserID(c)
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
+		return err
+	}
 	commentIDStr := c.Params("commentId")
 	commentID, err := uuid.Parse(commentIDStr)
 	if err != nil {

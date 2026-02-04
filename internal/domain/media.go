@@ -7,7 +7,7 @@ import (
 )
 
 type Media struct {
-	ID          uuid.UUID  `json:"id" db:"id"`
+	ID          uuid.UUID  `json:"id" db:"media_id"`
 	PersonID    *uuid.UUID `json:"person_id,omitempty" db:"person_id"`
 	UploadedBy  uuid.UUID  `json:"uploaded_by" db:"uploaded_by"`
 	FileName    string     `json:"file_name" db:"file_name"`

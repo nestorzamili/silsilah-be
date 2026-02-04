@@ -8,7 +8,7 @@ import (
 )
 
 type Notification struct {
-	ID        uuid.UUID        `json:"id" db:"id"`
+	ID        uuid.UUID        `json:"id" db:"notification_id"`
 	UserID    uuid.UUID        `json:"user_id" db:"user_id"`
 	Type      NotificationType `json:"type" db:"type"`
 	Title     string           `json:"title" db:"title"`

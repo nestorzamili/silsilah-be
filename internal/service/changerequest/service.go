@@ -1,4 +1,4 @@
-package service
+package changerequest
 
 import (
 	"context"
@@ -10,6 +10,10 @@ import (
 
 	"silsilah-keluarga/internal/domain"
 	"silsilah-keluarga/internal/repository"
+	"silsilah-keluarga/internal/service/media"
+	"silsilah-keluarga/internal/service/notification"
+	"silsilah-keluarga/internal/service/person"
+	"silsilah-keluarga/internal/service/relationship"
 )
 
 type RequestMeta struct {
@@ -17,28 +21,30 @@ type RequestMeta struct {
 	UserAgent string
 }
 
-type ChangeRequestService interface {
+type Service interface {
 	Create(ctx context.Context, userID uuid.UUID, input domain.CreateChangeRequestInput) (*domain.ChangeRequest, error)
 	GetByID(ctx context.Context, id uuid.UUID) (*domain.ChangeRequest, error)
 	List(ctx context.Context, status *domain.ChangeRequestStatus, params domain.PaginationParams) (domain.PaginatedResponse[domain.ChangeRequest], error)
 	Approve(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error
 	Reject(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error
+	SetNotificationService(notifSvc notification.Service)
 }
 
-type changeRequestService struct {
-	crRepo       repository.ChangeRequestRepository
-	notifRepo    repository.NotificationRepository
-	userRepo     repository.UserRepository
-	personRepo   repository.PersonRepository
-	relRepo      repository.RelationshipRepository
-	mediaRepo    repository.MediaRepository
-	auditRepo    repository.AuditLogRepository
-	personSvc    PersonService
-	relSvc       RelationshipService
-	mediaSvc     MediaService
+type service struct {
+	crRepo     repository.ChangeRequestRepository
+	notifRepo  repository.NotificationRepository
+	userRepo   repository.UserRepository
+	personRepo repository.PersonRepository
+	relRepo    repository.RelationshipRepository
+	mediaRepo  repository.MediaRepository
+	auditRepo  repository.AuditLogRepository
+	personSvc  person.Service
+	relSvc     relationship.Service
+	mediaSvc   media.Service
+	notifSvc   notification.Service
 }
 
-func NewChangeRequestService(
+func NewService(
 	crRepo repository.ChangeRequestRepository,
 	notifRepo repository.NotificationRepository,
 	userRepo repository.UserRepository,
@@ -46,11 +52,11 @@ func NewChangeRequestService(
 	relRepo repository.RelationshipRepository,
 	mediaRepo repository.MediaRepository,
 	auditRepo repository.AuditLogRepository,
-	personSvc PersonService,
-	relSvc RelationshipService,
-	mediaSvc MediaService,
-) ChangeRequestService {
-	return &changeRequestService{
+	personSvc person.Service,
+	relSvc relationship.Service,
+	mediaSvc media.Service,
+) Service {
+	return &service{
 		crRepo:     crRepo,
 		notifRepo:  notifRepo,
 		userRepo:   userRepo,
@@ -64,7 +70,11 @@ func NewChangeRequestService(
 	}
 }
 
-func (s *changeRequestService) Create(ctx context.Context, userID uuid.UUID, input domain.CreateChangeRequestInput) (*domain.ChangeRequest, error) {
+func (s *service) SetNotificationService(notifSvc notification.Service) {
+	s.notifSvc = notifSvc
+}
+
+func (s *service) Create(ctx context.Context, userID uuid.UUID, input domain.CreateChangeRequestInput) (*domain.ChangeRequest, error) {
 	if err := s.validatePayload(input); err != nil {
 		return nil, err
 	}
@@ -89,7 +99,7 @@ func (s *changeRequestService) Create(ctx context.Context, userID uuid.UUID, inp
 	return cr, nil
 }
 
-func (s *changeRequestService) validatePayload(input domain.CreateChangeRequestInput) error {
+func (s *service) validatePayload(input domain.CreateChangeRequestInput) error {
 	if !json.Valid(input.Payload) {
 		return errors.New("invalid JSON payload")
 	}
@@ -107,7 +117,14 @@ func (s *changeRequestService) validatePayload(input domain.CreateChangeRequestI
 	return nil
 }
 
-func (s *changeRequestService) notifyReviewers(ctx context.Context, cr *domain.ChangeRequest) {
+func (s *service) notifyReviewers(ctx context.Context, cr *domain.ChangeRequest) {
+	if s.notifSvc != nil {
+		go func() {
+			_ = s.notifSvc.NotifyChangeRequest(context.Background(), cr.ID, cr.RequestedBy)
+		}()
+		return
+	}
+
 	reviewers, err := s.userRepo.GetByRoles(ctx, []domain.UserRole{domain.RoleEditor, domain.RoleDeveloper})
 	if err != nil {
 		return
@@ -131,11 +148,11 @@ func (s *changeRequestService) notifyReviewers(ctx context.Context, cr *domain.C
 	}
 }
 
-func (s *changeRequestService) GetByID(ctx context.Context, id uuid.UUID) (*domain.ChangeRequest, error) {
+func (s *service) GetByID(ctx context.Context, id uuid.UUID) (*domain.ChangeRequest, error) {
 	return s.crRepo.GetByID(ctx, id)
 }
 
-func (s *changeRequestService) List(ctx context.Context, status *domain.ChangeRequestStatus, params domain.PaginationParams) (domain.PaginatedResponse[domain.ChangeRequest], error) {
+func (s *service) List(ctx context.Context, status *domain.ChangeRequestStatus, params domain.PaginationParams) (domain.PaginatedResponse[domain.ChangeRequest], error) {
 	requests, total, err := s.crRepo.List(ctx, status, params)
 	if err != nil {
 		return domain.PaginatedResponse[domain.ChangeRequest]{}, err
@@ -156,7 +173,7 @@ func (s *changeRequestService) List(ctx context.Context, status *domain.ChangeRe
 	return domain.NewPaginatedResponse(requests, params.Page, params.PageSize, total), nil
 }
 
-func (s *changeRequestService) Approve(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error {
+func (s *service) Approve(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error {
 	cr, err := s.crRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -174,13 +191,13 @@ func (s *changeRequestService) Approve(ctx context.Context, id, reviewerID uuid.
 		return err
 	}
 
-	s.notifyRequester(ctx, cr, domain.StatusApproved, note)
+	s.notifyRequester(ctx, cr, domain.StatusApproved, reviewerID, note)
 	s.logAudit(ctx, reviewerID, "APPROVE_CHANGE_REQUEST", cr, meta)
 
 	return nil
 }
 
-func (s *changeRequestService) Reject(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error {
+func (s *service) Reject(ctx context.Context, id, reviewerID uuid.UUID, note *string, meta *RequestMeta) error {
 	cr, err := s.crRepo.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -194,13 +211,13 @@ func (s *changeRequestService) Reject(ctx context.Context, id, reviewerID uuid.U
 		return err
 	}
 
-	s.notifyRequester(ctx, cr, domain.StatusRejected, note)
+	s.notifyRequester(ctx, cr, domain.StatusRejected, reviewerID, note)
 	s.logAudit(ctx, reviewerID, "REJECT_CHANGE_REQUEST", cr, meta)
 
 	return nil
 }
 
-func (s *changeRequestService) validateReview(ctx context.Context, cr *domain.ChangeRequest, reviewerID uuid.UUID) error {
+func (s *service) validateReview(ctx context.Context, cr *domain.ChangeRequest, reviewerID uuid.UUID) error {
 	if cr.Status != domain.StatusPending {
 		return errors.New("change request is not pending")
 	}
@@ -225,7 +242,7 @@ func (s *changeRequestService) validateReview(ctx context.Context, cr *domain.Ch
 	return nil
 }
 
-func (s *changeRequestService) executeChange(ctx context.Context, cr *domain.ChangeRequest) error {
+func (s *service) executeChange(ctx context.Context, cr *domain.ChangeRequest) error {
 	switch cr.EntityType {
 	case domain.EntityPerson:
 		return s.executePersonChange(ctx, cr)
@@ -238,7 +255,7 @@ func (s *changeRequestService) executeChange(ctx context.Context, cr *domain.Cha
 	}
 }
 
-func (s *changeRequestService) executePersonChange(ctx context.Context, cr *domain.ChangeRequest) error {
+func (s *service) executePersonChange(ctx context.Context, cr *domain.ChangeRequest) error {
 	switch cr.Action {
 	case domain.ActionCreate:
 		var person domain.Person
@@ -247,7 +264,16 @@ func (s *changeRequestService) executePersonChange(ctx context.Context, cr *doma
 		}
 		person.ID = uuid.New()
 		person.CreatedBy = cr.RequestedBy
-		return s.personRepo.Create(ctx, &person)
+		if err := s.personRepo.Create(ctx, &person); err != nil {
+			return err
+		}
+
+		if s.notifSvc != nil {
+			go func() {
+				_ = s.notifSvc.NotifyPersonAdded(context.Background(), person.ID, cr.RequestedBy)
+			}()
+		}
+		return nil
 
 	case domain.ActionUpdate:
 		if cr.EntityID == nil {
@@ -278,14 +304,14 @@ func (s *changeRequestService) executePersonChange(ctx context.Context, cr *doma
 	}
 }
 
-func (s *changeRequestService) executeRelationshipChange(ctx context.Context, cr *domain.ChangeRequest) error {
+func (s *service) executeRelationshipChange(ctx context.Context, cr *domain.ChangeRequest) error {
 	switch cr.Action {
 	case domain.ActionCreate:
 		var input struct {
-			PersonA  uuid.UUID              `json:"person_a"`
-			PersonB  uuid.UUID              `json:"person_b"`
+			PersonA  uuid.UUID               `json:"person_a"`
+			PersonB  uuid.UUID               `json:"person_b"`
 			Type     domain.RelationshipType `json:"type"`
-			Metadata json.RawMessage        `json:"metadata,omitempty"`
+			Metadata json.RawMessage         `json:"metadata,omitempty"`
 		}
 		if err := json.Unmarshal(cr.Payload, &input); err != nil {
 			return err
@@ -298,7 +324,16 @@ func (s *changeRequestService) executeRelationshipChange(ctx context.Context, cr
 			Metadata:  input.Metadata,
 			CreatedBy: cr.RequestedBy,
 		}
-		return s.relRepo.Create(ctx, rel)
+		if err := s.relRepo.Create(ctx, rel); err != nil {
+			return err
+		}
+
+		if s.notifSvc != nil {
+			go func() {
+				_ = s.notifSvc.NotifyRelationshipAdded(context.Background(), rel.ID, cr.RequestedBy)
+			}()
+		}
+		return nil
 
 	case domain.ActionUpdate:
 		if cr.EntityID == nil {
@@ -329,7 +364,7 @@ func (s *changeRequestService) executeRelationshipChange(ctx context.Context, cr
 	}
 }
 
-func (s *changeRequestService) executeMediaChange(ctx context.Context, cr *domain.ChangeRequest) error {
+func (s *service) executeMediaChange(ctx context.Context, cr *domain.ChangeRequest) error {
 	switch cr.Action {
 	case domain.ActionCreate:
 		if cr.EntityID == nil {
@@ -348,7 +383,18 @@ func (s *changeRequestService) executeMediaChange(ctx context.Context, cr *domai
 	}
 }
 
-func (s *changeRequestService) notifyRequester(ctx context.Context, cr *domain.ChangeRequest, status domain.ChangeRequestStatus, note *string) {
+func (s *service) notifyRequester(ctx context.Context, cr *domain.ChangeRequest, status domain.ChangeRequestStatus, reviewerID uuid.UUID, note *string) {
+	if s.notifSvc != nil {
+		go func() {
+			if status == domain.StatusApproved {
+				_ = s.notifSvc.NotifyChangeApproved(context.Background(), cr.ID, reviewerID)
+			} else {
+				_ = s.notifSvc.NotifyChangeRejected(context.Background(), cr.ID, reviewerID)
+			}
+		}()
+		return
+	}
+
 	var title, message string
 	if status == domain.StatusApproved {
 		title = "Change Request Approved"
@@ -378,7 +424,7 @@ func (s *changeRequestService) notifyRequester(ctx context.Context, cr *domain.C
 	_ = s.notifRepo.Create(ctx, notif)
 }
 
-func (s *changeRequestService) logAudit(ctx context.Context, reviewerID uuid.UUID, action string, cr *domain.ChangeRequest, meta *RequestMeta) {
+func (s *service) logAudit(ctx context.Context, reviewerID uuid.UUID, action string, cr *domain.ChangeRequest, meta *RequestMeta) {
 	var entityID uuid.UUID
 	if cr.EntityID != nil {
 		entityID = *cr.EntityID

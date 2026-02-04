@@ -1,0 +1,43 @@
+{{define "content"}}
+		<h2 style="color: #111827; margin-top: 0;">
+			Halo, {{.Name}}!
+		</h2>
+
+		<p>
+			Terima kasih telah bergabung dengan <strong>Silsilah Keluarga</strong>.
+			Bersama, kita membangun silsilah keluarga kita untuk menghubungkan generasi dan melestarikan kisah keluarga kita.
+		</p>
+
+		<div style="background-color: #eff6ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3b82f6;">
+			<h3 style="margin-top: 0; color: #1e40af;">
+				Langkah Verifikasi
+			</h3>
+			<p style="margin-bottom: 0;">
+				Klik tombol di bawah ini untuk memverifikasi alamat email Anda.  
+				Tautan ini akan kedaluwarsa dalam <strong>24 jam</strong>.
+			</p>
+		</div>
+
+		<!-- Button -->
+		<div style="text-align: center; margin: 30px 0;">
+			<a href="{{.Link}}"
+			   style="background-color: #3b82f6; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+				Verifikasi Email Saya
+			</a>
+		</div>
+
+		<!-- Fallback Link -->
+		<p style="font-size: 14px; color: #6b7280;">
+			Jika tombol di atas tidak berfungsi, salin dan tempel tautan berikut ke browser Anda:
+			<br>
+			<a href="{{.Link}}" style="color: #3b82f6; word-break: break-all;">
+				{{.Link}}
+			</a>
+		</p>
+
+		<!-- Security Note -->
+		<p style="font-size: 14px; color: #6b7280;">
+			Jika Anda tidak merasa mendaftar di Silsilah Keluarga, abaikan email ini.  
+			Demi keamanan, jangan pernah membagikan tautan verifikasi kepada siapa pun.
+		</p>
+{{end}}
